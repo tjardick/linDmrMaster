@@ -124,7 +124,6 @@ struct allow checkTalkGroup(int dstId, int slot, int callType){
 	}
 	toSend.repeater = false;
 	toSend.sMaster = false;
-	syslog(LOG_NOTICE,"Talk group %i not allowed on slot %i",dstId,slot);
 	return toSend;
 }
 
@@ -227,6 +226,7 @@ void *dmrListener(void *f){
 	time_t timeNow,pingTime;
 	struct allow toSend = {0};
 	bool block[3];
+	bool receivingData[3] = {0};
 	unsigned char sMasterFrame[103];
 	char myId[11];
 	unsigned char webUserInfo[100];
@@ -309,6 +309,7 @@ void *dmrListener(void *f){
 							toSend = checkTalkGroup(dstId[slot],slot,callType[slot]);
 							if (toSend.repeater == false){
 								block[slot] = true;
+								syslog(LOG_NOTICE,"[%s]Talk group %i not configured on slot %i so not relaying",repeaterList[repPos].callsign,dstId[slot],slot);
 								break;
 							}
 							if(toSend.isRange && dstId[slot] != master.ownCCInt){
@@ -338,18 +339,18 @@ void *dmrListener(void *f){
 						
 						if (slotType[slot] == 0x4444){  //Data header
 							repeaterList[repPos].sending[slot] = true;
-							//dmrState[slot] = DATA;
+							receivingData[slot] = true;
 							dataBlocks[slot] = 0;
 							BPTC1969decode[slot] = decodeBPTC1969(bits);
 							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
 							break;
 						}
 						
-						if (slotType[slot] == 0x5555){ // 1/2 rate data continuation
+						if (slotType[slot] == 0x5555 && receivingData[slot]){ // 1/2 rate data continuation
 							//syslog(LOG_NOTICE,"[%s]1/2 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
-								//dmrState[slot] = IDLE;
+								receivingData[slot] = false;
 								block[slot] = false;
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
@@ -357,14 +358,14 @@ void *dmrListener(void *f){
 							}
 							break;
 						}
-						if (slotType[slot] == 0x6666){ // 3/4 rate data continuation
+						if (slotType[slot] == 0x6666 && receivingData[slot]){ // 3/4 rate data continuation
 							syslog(LOG_NOTICE,"[%s]3/4 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
 								block[slot] = false;
-								//dmrState[slot] = IDLE;
+								receivingData[slot] = false;
 								//printf("String\n");
 								//for(ii=0;ii<(dataBlocks[slot]*18);ii++){
 									//printf("(%02X)%c",decodedString[slot][ii],decodedString[slot][ii]);
@@ -389,7 +390,7 @@ void *dmrListener(void *f){
 							dmrState[slot] = IDLE;
 							repeaterList[repPos].sending[slot] = false;
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i",repeaterList[repPos].callsign,slot);
-							if (block[slot] == true) syslog(LOG_NOTICE,"[%s] But was blocked because of not allowed talk group",repeaterList[repPos].callsign);
+							if (block[slot] == true) syslog(LOG_NOTICE,"[%s] But was not relaying because of not configured talk group",repeaterList[repPos].callsign);
 							block[slot] = false;
 						}
 						break;
@@ -426,9 +427,11 @@ void *dmrListener(void *f){
 			time(&timeNow);
 			if (repeaterList[repPos].sending[1] && dmrState[1] != IDLE){
 				if (dmrState[1] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 1",repeaterList[repPos].callsign);
-				if (dmrState[1] == DATA){
+				if (receivingData[1]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 1",repeaterList[repPos].callsign);
 					dataBlocks[1] = 0;
+					receivingData[1] = false;
+					memset(decodedString[1],0,300);
 				}
 				dmrState[1] = IDLE;
 				repeaterList[repPos].sending[1] = false;
@@ -437,9 +440,11 @@ void *dmrListener(void *f){
 			}
 			if (repeaterList[repPos].sending[2] && dmrState[2] != IDLE){
 				if (dmrState[2] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
-				if (dmrState[2] == DATA){
+				if (receivingData[2]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					dataBlocks[2] = 0;
+					receivingData[2] = false;
+					memset(decodedString[2],0,300);
 				}
 				dmrState[2] = IDLE;
 				repeaterList[repPos].sending[2] = false;
