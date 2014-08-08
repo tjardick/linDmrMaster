@@ -85,16 +85,13 @@ bool isTableExisting(sqlite3 *db, char *table){
 }
 
 int initDatabase(sqlite3 *db){
-	sqlite3_stmt *stmt;
-	char SQLQUERY[400];
-	bool neededToCreate = false;
+	char SQLQUERY[1000];
 	
 	if (!isTableExisting(db,"master")){
-		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId in default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080')");
-		if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-			neededToCreate = true;
+		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId int default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080')");
+		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			sprintf(SQLQUERY,"INSERT INTO master (repTS1) VALUES ('')");
-			if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+			if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 				syslog(LOG_NOTICE,"Table master created");
 			}
 			else{
@@ -109,10 +106,9 @@ int initDatabase(sqlite3 *db){
 	}
 	if (!isTableExisting(db,"sMaster")){
 		sprintf(SQLQUERY,"CREATE TABLE sMaster (ownName VARCHAR(100) default '',ownCountryCode VARCHAR(5) default '',ownRegion VARCHAR(2) default '',sMasterIp VARCHAR(100) default '', sMasterPort VARCHAR(5) default '62010')");
-		if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-			neededToCreate = true;
+		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			sprintf(SQLQUERY,"INSERT INTO sMaster (ownName) VALUES ('')");
-			if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+			if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 				syslog(LOG_NOTICE,"Table sMaster created");
 			}
 			else{
@@ -128,8 +124,7 @@ int initDatabase(sqlite3 *db){
 
 	if (!isTableExisting(db,"repeaters")){
 		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default '')");
-		if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-			neededToCreate = true;
+		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table repeater created");
 		}
 		else{
@@ -140,8 +135,7 @@ int initDatabase(sqlite3 *db){
 
 	if (!isTableExisting(db,"callsigns")){
 		sprintf(SQLQUERY,"CREATE TABLE callsigns (radioId INTEGER default 0, callsign VARCHAR(32) default '', name VARCHAR(32) default '', aprsSuffix VARCHAR(3) default '', aprsBeacon VARCHAR(100) default 'DMR terminal', aprsSymbol INTEGER default 62, hasSendAprs INTEGER default 0, messageStore INTEGER default 1, email VARCHAR(100) default '', login VARCHAR(50) default '', password VARCHAR(50) default '', lastAprsTime INTEGER default 0, madeChange INTEGER default 0, city VARCHAR(32) default '', state VARCHAR(32) default '', country VARCHAR(32) default '', radio VARCHAR(32) default '', homeRepeaterId VARCHAR(32) default '', remarks VARCHAR(32) default '')");
-		if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-			neededToCreate = true;
+		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table callsigns created");
 		}
 		else{
@@ -241,5 +235,5 @@ int initDatabase(sqlite3 *db){
         }
 
 		
-	if (neededToCreate) return 2; else return 1;
+	return 1;
 }

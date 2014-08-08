@@ -43,6 +43,7 @@ int restart = 0;
 sqlite3 *db;
 sqlite3 *openDatabase();
 void closeDatabase();
+int initDatabase();
 
 int setRdacRepeater();
 int findRdacRepeater();
@@ -649,6 +650,7 @@ int main(int argc, char**argv)
 	dbInit = initDatabase(db);
 	if (dbInit == 0){
 		syslog(LOG_NOTICE,"Failed to init database");
+		closeDatabase(db);
 		return 0;
 	}
 	closeDatabase(db);

@@ -39,7 +39,7 @@ void    CleanURL  (char * buffer);
 ssize_t Readline  (int sockd, void *vptr, size_t maxlen);
 ssize_t Writeline (int sockd, const void *vptr, size_t n);
 
-#define SERVER_PORT            (8080)
+#define SERVER_PORT            (8333)
 
 char *htmlReplace();
 

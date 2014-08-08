@@ -28,17 +28,18 @@ void closeDatabase();
 
 int handlePost(int conn, struct ReqInfo  *reqinfo){
 	char buffer[MAX_REQ_LINE] = {0};
-    fd_set fds;
-    struct timeval tv;
+	fd_set fds;
+	struct timeval tv;
 	int rval;
 	
 	tv.tv_sec  = 1;
-    tv.tv_usec = 0;
+	tv.tv_usec = 0;
 	
 	for (;;){
 		FD_ZERO(&fds);
 		FD_SET (conn, &fds);
-	
+
+		syslog(LOG_NOTICE,"Waiting for post info");
 		rval = select(conn + 1, &fds, NULL, NULL, &tv);
 		if ( rval < 0 ) {
 			syslog(LOG_NOTICE,"Error calling select() in get_request()");
@@ -47,11 +48,13 @@ int handlePost(int conn, struct ReqInfo  *reqinfo){
 			break;
 		}
 		else {
+			syslog(LOG_NOTICE,"before readline");
 			Readline(conn, buffer, MAX_REQ_LINE - 1);
 			Trim(buffer);
 			handleParameter(buffer);
 		}
 	}
+	syslog(LOG_NOTICE,"Restart set");
 	restart = 1;
 }
 
@@ -60,6 +63,7 @@ void handleParameter(char buffer[MAX_REQ_LINE]){
 	char *value;
 	char *listValue;
 	char SQLQUERY[300];
+	syslog(LOG_NOTICE,"POST received %s",buffer);
 	db = openDatabase(); 
 	if(param = strtok(buffer,"=")){
 		if (strstr(param,"page")){
