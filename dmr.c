@@ -215,12 +215,12 @@ void *dmrListener(void *f){
 	struct sockInfo* param = (struct sockInfo*) f;
 	int repPos = param->port - baseDmrPort;
 	struct sockaddr_in cliaddrOrg = param->address;
-	int packetType = 0;
-	int frameType = 0;
-	int slotType = 0;
-	int srcId = 0;
-	int dstId = 0;
-	int callType = 0;
+	int packetType[3] = {0};
+	int frameType[3] = {0};
+	int slotType[3] = {0};
+	int srcId[3] = {0};
+	int dstId[3] = {0};
+	int callType[3] = {0};
 	unsigned char slot = 0;
 	fd_set fdMaster;
 	struct timeval timeout;
@@ -282,87 +282,89 @@ void *dmrListener(void *f){
 			if (n>2){
 				slot = buffer[SLOT_OFFSET1] / 16;
 				if (dmrState[slot] == IDLE || repeaterList[repPos].sending[slot]){
-					packetType = buffer[PTYPE_OFFSET];
-					slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
-					frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
-					switch (packetType){
+					packetType[slot] = buffer[PTYPE_OFFSET];
+					slotType[slot] = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+					frameType[slot]  = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+					switch (packetType[slot]){
 				
 						case 0x02:
-						if (slotType == 0xeeee && frameType == 0x1111 && dmrState[slot] != VOICE && block[slot] == false){ //Hytera voice sync packet
+						if (slotType[slot] == 0xeeee && frameType[slot] == 0x1111 && dmrState[slot] != VOICE && block[slot] == false){ //Hytera voice sync packet
 							//Sync packet is send before Voice LC header and every time the embedded LC (4 packets) in a voice superframe has been send
 							//When voice call starts, this is the first packet where we can see src and dst)
 							sMasterFrame[98] = slot;
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
+							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+							callType[slot] = buffer[TYP_OFFSET1];
 							repeaterList[repPos].sending[slot] = true;
-							sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId,srcId,version,repeaterList[repPos].id,master.ownName);
+							sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
 							if (sMaster.online){
 								sendto(sMaster.sockfd,webUserInfo,strlen(webUserInfo),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 							}
-							if (dstId == echoId){
-								syslog(LOG_NOTICE,"[%s]Echo test started on slot %i src %i",repeaterList[repPos].callsign,slot,srcId);
-								echoTest(buffer,sockfd,repeaterList[repPos].address,srcId,repPos);
+							if (dstId[slot] == echoId){
+								syslog(LOG_NOTICE,"[%s]Echo test started on slot %i src %i",repeaterList[repPos].callsign,slot,srcId[slot]);
+								echoTest(buffer,sockfd,repeaterList[repPos].address,srcId[slot],repPos);
 								repeaterList[repPos].sending[slot] = false;
 								break;
 							} 
-							toSend = checkTalkGroup(dstId,slot,callType);
+							toSend = checkTalkGroup(dstId[slot],slot,callType[slot]);
 							if (toSend.repeater == false){
 								block[slot] = true;
 								break;
 							}
-							if(toSend.isRange && dstId != master.ownCCInt){
+							if(toSend.isRange && dstId[slot] != master.ownCCInt){
 								memcpy(sMasterFrame+90,(char*)&master.ownCCInt,sizeof(int));
 							}
 							else{
 								memset(sMasterFrame+90,0,4);
 							}
 							dmrState[slot] = VOICE;
-							syslog(LOG_NOTICE,"[%s]Voice call started on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId,dstId,callType);
+							syslog(LOG_NOTICE,"[%s]Voice call started on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							//break;
 						}
 						break;
 						
 						case 0x01:
-						if (slotType == 0x3333 && dmrState[slot] != DATA){  //CSBK (first slot type for data where we can see src and dst)
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
+						if (slotType[slot] == 0x3333 && dmrState[slot] != DATA){  //CSBK (first slot type for data where we can see src and dst)
+							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+							callType[slot] = buffer[TYP_OFFSET1];
 							toSend.sMaster = false;
-							if (dstId == rrsGpsId) toSend.repeater = false;
+							if (dstId[slot] == rrsGpsId) block[slot] == true;
 							break;
 						}
 						
 						memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
 						bits = convertToBits(dmrPacket); //convert it to bits
 						
-						if (slotType == 0x4444){  //Data header
+						if (slotType[slot] == 0x4444){  //Data header
 							repeaterList[repPos].sending[slot] = true;
-							dmrState[slot] = DATA;
+							//dmrState[slot] = DATA;
 							dataBlocks[slot] = 0;
 							BPTC1969decode[slot] = decodeBPTC1969(bits);
-							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId,dstId,callType,BPTC1969decode[slot].appendBlocks);
+							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
 							break;
 						}
 						
-						if (slotType == 0x5555 && dmrState[slot] == DATA){ // 1/2 rate data continuation
-							//syslog(LOG_NOTICE,"[%s]1/2 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId,dstId,callType);
+						if (slotType[slot] == 0x5555){ // 1/2 rate data continuation
+							//syslog(LOG_NOTICE,"[%s]1/2 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
-								dmrState[slot] = IDLE;
+								//dmrState[slot] = IDLE;
+								block[slot] = false;
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								//syslog(LOG_NOTICE,"[%s]All data blocks received",repeaterList[repPos].callsign);
 							}
 							break;
 						}
-						if (slotType == 0x6666 && dmrState[slot] == DATA){ // 3/4 rate data continuation
-							syslog(LOG_NOTICE,"[%s]3/4 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId,dstId,callType);
+						if (slotType[slot] == 0x6666){ // 3/4 rate data continuation
+							syslog(LOG_NOTICE,"[%s]3/4 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
-								dmrState[slot] = IDLE;
+								block[slot] = false;
+								//dmrState[slot] = IDLE;
 								//printf("String\n");
 								//for(ii=0;ii<(dataBlocks[slot]*18);ii++){
 									//printf("(%02X)%c",decodedString[slot][ii],decodedString[slot][ii]);
@@ -372,10 +374,10 @@ void *dmrListener(void *f){
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]All data blocks received",repeaterList[repPos].callsign);
 								//printf("--------------------------------------------------------------\n");
-								if (dstId == rrsGpsId){
-									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId,repeaterList[repPos],decodedString[slot]);
-									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId,repeaterList[repPos],decodedString[slot]);
-									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId,repeaterList[repPos],decodedString[slot]);
+								if (dstId[slot] == rrsGpsId){
+									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
+									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],repeaterList[repPos],decodedString[slot]);
+									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
 								}
 								memset(decodedString[slot],0,300);
 							}
@@ -383,7 +385,7 @@ void *dmrListener(void *f){
 						break;
 						
 						case 0x03:
-						if (slotType == 0x2222){  //Terminator with LC
+						if (slotType[slot] == 0x2222){  //Terminator with LC
 							dmrState[slot] = IDLE;
 							repeaterList[repPos].sending[slot] = false;
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i",repeaterList[repPos].callsign,slot);
