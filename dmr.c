@@ -347,35 +347,27 @@ void *dmrListener(void *f){
 						}
 						
 						if (slotType[slot] == 0x5555 && receivingData[slot]){ // 1/2 rate data continuation
-							//syslog(LOG_NOTICE,"[%s]1/2 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
 								receivingData[slot] = false;
 								block[slot] = false;
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
-								//syslog(LOG_NOTICE,"[%s]All data blocks received",repeaterList[repPos].callsign);
+								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							}
 							break;
 						}
 						if (slotType[slot] == 0x6666 && receivingData[slot]){ // 3/4 rate data continuation
-							syslog(LOG_NOTICE,"[%s]3/4 rate data continuation on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
 								block[slot] = false;
 								receivingData[slot] = false;
-								//printf("String\n");
-								//for(ii=0;ii<(dataBlocks[slot]*18);ii++){
-									//printf("(%02X)%c",decodedString[slot][ii],decodedString[slot][ii]);
-								//}
-								//printf("\n");
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
-								syslog(LOG_NOTICE,"[%s]All data blocks received",repeaterList[repPos].callsign);
-								//printf("--------------------------------------------------------------\n");
-								if (dstId[slot] == rrsGpsId){
+								syslog(LOG_NOTICE,"[%s]3/4 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
+								if(dstId[slot] == rrsGpsId){
 									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);

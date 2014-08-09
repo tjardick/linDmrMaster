@@ -47,6 +47,7 @@ int initDatabase();
 
 int setRdacRepeater();
 int findRdacRepeater();
+void openAprsSock();
 
 state dmrState[3];
 
@@ -668,9 +669,11 @@ int main(int argc, char**argv)
 		//Start sMaster Thread
 		pthread_create(&thread, NULL, sMasterThread,NULL);
 		//Start listening on the service port
+		openAprsSock();
 		serviceListener(servicePort);
 		//If we got here, we are restarting, waiting for all threads to end
 		sleep(6);
+		close(aprsSockFd);
 		master = emptyMaster;
 		highestRepeater = 0;
 		for (i=0;i<99;i++){

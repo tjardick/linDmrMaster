@@ -23,12 +23,11 @@ void closeDatabase();
 
 char aprsUrl[100];
 char aprsPort[7];
+int aprsSockFd;
 
-
-int openAprsSock(){
+void openAprsSock(){
 
 	int rv;
-	int sockfd;
 	struct addrinfo hints, *servinfo, *p;
 	
 	memset(&hints, 0, sizeof hints);
@@ -36,7 +35,7 @@ int openAprsSock(){
 	hints.ai_socktype = SOCK_DGRAM;
 	char ipstr[INET_ADDRSTRLEN];
 
-    syslog(LOG_NOTICE,"Opening APRS socket");
+    syslog(LOG_NOTICE,"Opening APRS socket %s %s",aprsUrl,aprsPort);
 	if ((rv = getaddrinfo(aprsUrl, aprsPort, &hints, &servinfo)) != 0) {
 		syslog(LOG_NOTICE,"getaddrinfo: %s\n", gai_strerror(rv));
 		return;
@@ -49,12 +48,12 @@ int openAprsSock(){
 		addr = &(ipv->sin_addr);
 		inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr); 
 		syslog(LOG_NOTICE,"address: %s",ipstr);
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) {
+		if ((aprsSockFd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) {
 			syslog(LOG_NOTICE,"Not able to create APRS sock");
 			continue;
 		}
-		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			close(sockfd);
+		if (connect(aprsSockFd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(aprsSockFd);
 			syslog(LOG_NOTICE,"Error to connect to APRS");
 			continue;
 		}
@@ -71,9 +70,9 @@ void sendAprsBeacon(char callsign[10],char pass[6],char loc[20],char phg[7],char
 	int sockfd;
 
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s>APRS,%s,qAR,%s:!%s&%s%s",callsign,pass,callsign,callsign,callsign,loc,phg,text);
-	openAprsSock();
-	send(sockfd,toSend,strlen(toSend),0);
-	close(sockfd);
+	//openAprsSock();
+	//send(sockfd,toSend,strlen(toSend),0);
+	//close(sockfd);
 
 }
 
@@ -125,10 +124,12 @@ void sendAprs(struct gpsCoordinates gpsData, int radioId, struct repeater repeat
 	aprsCor[18] = radioIdent.aprsSymbol;
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s%s>APRS,%s,qAR,%s:!%s %s\n",repeater.callsign,repeater.aprsPass,radioIdent.callsign,radioIdent.aprsSuffix,repeater.callsign,repeater.callsign,aprsCor,radioIdent.aprsBeacon);
 
-	//sockfd = openAprsSock();
-	//send(sockfd,toSend,strlen(toSend),0);
-	//close(sockfd);
-	syslog(LOG_NOTICE,"[%s]Would send info to APRS network for %s [%s]",repeater.callsign,radioIdent.callsign,toSend);
+	if(!send(aprsSockFd,toSend,strlen(toSend),0)){
+		close(aprsSockFd);
+		openAprsSock();
+		send(aprsSockFd,toSend,strlen(toSend),0);
+	}
+	syslog(LOG_NOTICE,"[%s]Send info to APRS network for %s [%s]",repeater.callsign,radioIdent.callsign,toSend);
 }
 
 
@@ -141,7 +142,7 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
 
         reti = regcomp(&regex, "^[0-9][0-9][0-9][0-9][.][0-9][0-9][NZ]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Hyt GPS decode,could not compile regex latitude",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Ccould not compile regex latitude",repeater.callsign);
                 return 0;
         }
         reti = regexec(&regex,gpsData.latitude,0,NULL,0);
@@ -154,7 +155,7 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
 
         reti = regcomp(&regex, "^[0-9][0-9][0-9][0-9][0-9][.][0-9][0-9][EW]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Hyt GPS decode,could not compile regex longitude",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Ccould not compile regex longitude",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
@@ -167,7 +168,7 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
 
         reti = regcomp(&regex, "^[0-9][0-9][0-9]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Hyt GPS decode,could not compile regex heading",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Could not compile regex heading",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
@@ -180,7 +181,7 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
 
         reti = regcomp(&regex, "^[0-9.][0-9.][0-9.]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Hyt GPS decode,could not compile regex speed",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Could not compile regex speed",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }

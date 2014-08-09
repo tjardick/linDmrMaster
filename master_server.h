@@ -151,3 +151,4 @@ extern int restart;
 extern char page[50];
 extern char aprsUrl[100];
 extern char aprsPort[7];
+extern int aprsSockFd;
