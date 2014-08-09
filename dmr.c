@@ -417,7 +417,7 @@ void *dmrListener(void *f){
 				pthread_exit(NULL);
 			}
 			time(&timeNow);
-			if (repeaterList[repPos].sending[1] && dmrState[1] != IDLE){
+			if ((repeaterList[repPos].sending[1] && dmrState[1] != IDLE) || receivingData[1]){
 				if (dmrState[1] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 1",repeaterList[repPos].callsign);
 				if (receivingData[1]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 1",repeaterList[repPos].callsign);
@@ -430,7 +430,7 @@ void *dmrListener(void *f){
 				block[1] = false;
 				syslog(LOG_NOTICE,"[%s]Slot 1 IDLE",repeaterList[repPos].callsign);
 			}
-			if (repeaterList[repPos].sending[2] && dmrState[2] != IDLE){
+			if ((repeaterList[repPos].sending[2] && dmrState[2] != IDLE) || receivingData[2]){
 				if (dmrState[2] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
 				if (receivingData[2]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
