@@ -330,7 +330,7 @@ void *dmrListener(void *f){
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							callType[slot] = buffer[TYP_OFFSET1];
 							toSend.sMaster = false;
-							if (dstId[slot] == rrsGpsId) block[slot] == true;
+							if (dstId[slot] == rrsGpsId) block[slot] = true;
 							break;
 						}
 						
