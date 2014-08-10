@@ -226,6 +226,7 @@ void *dmrListener(void *f){
 	time_t timeNow,pingTime;
 	struct allow toSend = {0};
 	bool block[3];
+	bool releaseBlock[3];
 	bool receivingData[3] = {0};
 	unsigned char sMasterFrame[103];
 	char myId[11];
@@ -249,6 +250,8 @@ void *dmrListener(void *f){
 	repeaterList[repPos].sending[2] = false;
 	block[1] = false;
 	block[2] = false;
+	releaseBlock[1] = false;
+	releaseBlock[2] = false;
 	//create frame to append after packet for sMaster
 	memset(sMasterFrame,0,103);
 	memcpy(myId,(char*)&repeaterList[repPos].id,sizeof(int));
@@ -325,12 +328,12 @@ void *dmrListener(void *f){
 						break;
 						
 						case 0x01:
-						if (slotType[slot] == 0x3333 && dmrState[slot] != DATA){  //CSBK (first slot type for data where we can see src and dst)
+						if (slotType[slot] == 0x3333){  //CSBK (first slot type for data where we can see src and dst)
 							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							callType[slot] = buffer[TYP_OFFSET1];
 							toSend.sMaster = false;
-							if (dstId[slot] == rrsGpsId) block[slot] = true;
+							if (dstId[slot] == rrsGpsId || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
 							break;
 						}
 						
@@ -350,7 +353,7 @@ void *dmrListener(void *f){
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
 								receivingData[slot] = false;
-								block[slot] = false;
+								releaseBlock[slot] = true;
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
@@ -362,10 +365,6 @@ void *dmrListener(void *f){
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
-								block[slot] = false;
-								receivingData[slot] = false;
-								dataBlocks[slot] = 0;
-								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]3/4 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 								if(dstId[slot] == rrsGpsId){
 									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
@@ -373,6 +372,12 @@ void *dmrListener(void *f){
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
 								}
 								memset(decodedString[slot],0,300);
+							}
+							if(BPTC1969decode[slot].appendBlocks +1 == dataBlocks[slot]){//Hytera always repeats last datablock
+								releaseBlock[slot] = true;
+								receivingData[slot] = false;
+								dataBlocks[slot] = 0;
+								repeaterList[repPos].sending[slot] = false;
 							}
 						}
 						break;
@@ -382,8 +387,10 @@ void *dmrListener(void *f){
 							dmrState[slot] = IDLE;
 							repeaterList[repPos].sending[slot] = false;
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i",repeaterList[repPos].callsign,slot);
-							if (block[slot] == true) syslog(LOG_NOTICE,"[%s] But was not relaying because of not configured talk group",repeaterList[repPos].callsign);
-							block[slot] = false;
+							if (block[slot] == true){
+								syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
+								releaseBlock[slot] = true;
+							}
 						}
 						break;
 					}
@@ -397,6 +404,12 @@ void *dmrListener(void *f){
 							memcpy(sMasterFrame,buffer,n);
 							memcpy(sMasterFrame + n,myId,11);
 							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+						}
+					}
+					else{
+						if (releaseBlock[slot]){
+							block[slot] = false;
+							releaseBlock[slot] = false;
 						}
 					}
 				}
@@ -428,6 +441,7 @@ void *dmrListener(void *f){
 				dmrState[1] = IDLE;
 				repeaterList[repPos].sending[1] = false;
 				block[1] = false;
+				releaseBlock[1] = false;
 				syslog(LOG_NOTICE,"[%s]Slot 1 IDLE",repeaterList[repPos].callsign);
 			}
 			if ((repeaterList[repPos].sending[2] && dmrState[2] != IDLE) || receivingData[2]){
@@ -441,6 +455,7 @@ void *dmrListener(void *f){
 				dmrState[2] = IDLE;
 				repeaterList[repPos].sending[2] = false;
 				block[2] = false;
+				releaseBlock[2] = false;
 				syslog(LOG_NOTICE,"[%s]Slot 2 IDLE",repeaterList[repPos].callsign);
 			}
 			if (difftime(timeNow,pingTime) > 60 && !repeaterList[repPos].sending[slot]){
