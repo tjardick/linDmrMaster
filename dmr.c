@@ -289,8 +289,18 @@ void *dmrListener(void *f){
 					slotType[slot] = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 					frameType[slot]  = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
 					switch (packetType[slot]){
-				
+
 						case 0x02:
+
+						if (slotType[slot] == 0xeeee && frameType[slot] == 0x6666){//Sometimes start of data and no CSBK afterwards
+							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+							callType[slot] = buffer[TYP_OFFSET1];
+							toSend.sMaster = false;
+							if (dstId[slot] == rrsGpsId || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
+							break;
+						}
+
 						if (slotType[slot] == 0xeeee && frameType[slot] == 0x1111 && dmrState[slot] != VOICE && block[slot] == false){ //Hytera voice sync packet
 							//Sync packet is send before Voice LC header and every time the embedded LC (4 packets) in a voice superframe has been send
 							//When voice call starts, this is the first packet where we can see src and dst)
@@ -348,7 +358,17 @@ void *dmrListener(void *f){
 							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
 							break;
 						}
-						
+
+						if (slotType[slot] == 0x5555 && !receivingData[slot]){ // 1/2 rate data without valid header
+							block[slot] = true;
+							releaseBlock[slot] = true;
+							break;
+						}
+						if (slotType[slot] == 0x6666 && !receivingData[slot]){ // 3/4 rate data without valid header
+							block[slot] = true;
+							releaseBlock[slot] = true;
+							break;
+						}
 						if (slotType[slot] == 0x5555 && receivingData[slot]){ // 1/2 rate data continuation
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
@@ -365,6 +385,10 @@ void *dmrListener(void *f){
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
+								releaseBlock[slot] = true;
+								receivingData[slot] = false;
+								dataBlocks[slot] = 0;
+								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]3/4 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 								if(dstId[slot] == rrsGpsId){
 									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
@@ -372,12 +396,6 @@ void *dmrListener(void *f){
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
 								}
 								memset(decodedString[slot],0,300);
-							}
-							if(BPTC1969decode[slot].appendBlocks +1 == dataBlocks[slot]){//Hytera always repeats last datablock
-								releaseBlock[slot] = true;
-								receivingData[slot] = false;
-								dataBlocks[slot] = 0;
-								repeaterList[repPos].sending[slot] = false;
 							}
 						}
 						break;

@@ -26,7 +26,7 @@ int INTERLEAVE[] ={
                         4,5,12,13,20,21,28,29,36,37,44,45,52,53,60,61,68,69,76,77,84,85,92,93,
                         6,7,14,15,22,23,30,31,38,39,46,47,54,55,62,63,70,71,78,79,86,87,94,95};
 
- unsigned char STATETABLE[]={
+unsigned char STATETABLE[]={
                         0,8,4,12,2,10,6,14,
                         4,12,2,10,6,14,0,8,
                         1,9,5,13,3,11,7,15,
@@ -38,10 +38,10 @@ int INTERLEAVE[] ={
 
 
 
-char * extractDibits(bool * rawBits){
+int * extractDibits(bool * rawBits){
 	int a,index=0,deinterleave;
-	char  trellisDibit=0;
-	static char encDibit[98];
+	int  trellisDibit=0;
+	static int encDibit[98];
 	for (a=0;a<196;a=a+2)	{
 		// Set the dibits
 		// 01 = +3
@@ -66,7 +66,7 @@ char * extractDibits(bool * rawBits){
 	return encDibit;
 }
 
-char *  constellationOut (char *  encDibit){
+char *  constellationOut (int *  encDibit){
 	static char  constellationPoints[49];
 	int a,index=0;
 	//printf("constellation: ");
@@ -115,7 +115,7 @@ int * tribitExtract (char *  cons){
 		//printf("%i:",tribit[a]);
 		// If no match found then we have a problem
 		if (match==false){
-			//printf("no match %i !!!\n",a);
+			syslog(LOG_NOTICE,"TRIBIT EXTRACT no match %i !!!\n",a);
 			return NULL;
 		}
 	}
@@ -125,18 +125,20 @@ int * tribitExtract (char *  cons){
 
 bool * binaryConvert (int * tribit){
 	int a,b=0;
-	static bool out[144];
+	static bool out[144] = {0};
 
-	for (a=0;a<144;a=a+3)	{
-		// Convert three bits at a time
-		if ((*(tribit+b)&4)>0) out[a]=true;
-		else  out[a]=false;
-		if ((*(tribit+b)&2)>0) out[a+1]=true;
-		else  out[a+1]=false;
-		if ((*(tribit+b)&1)>0) out[a+2]=true;
-		else  out[a+2]=false;
-		// Increment the bit counter
-		b++;
+	if (tribit != NULL){
+		for (a=0;a<144;a=a+3)	{
+			// Convert three bits at a time
+			if ((*(tribit+b)&4)>0) out[a]=true;
+			else  out[a]=false;
+			if ((*(tribit+b)&2)>0) out[a+1]=true;
+			else  out[a+1]=false;
+			if ((*(tribit+b)&1)>0) out[a+2]=true;
+			else  out[a+2]=false;
+			// Increment the bit counter
+			b++;
+		}
 	}
 	return out;
 }
@@ -144,11 +146,11 @@ bool * binaryConvert (int * tribit){
 unsigned char *  decodeThreeQuarterRate(bool bits[264]){
 
 	bool *infoBits;  //196 info bits
-	char *dibits; //98 info dibits
+	int *dibits; //98 info dibits
 	char *constellationPoints; //49 constallation points
 	int *tribits; //49 tribits
 	bool *decodedBinary;  //144 bits
-	static unsigned char bb[18];
+	static unsigned char bb[18] = {0};
 	int x=0,a,i;
 
 	infoBits = extractInfo(bits);
