@@ -134,7 +134,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"callsigns")){
-		sprintf(SQLQUERY,"CREATE TABLE callsigns (radioId INTEGER default 0, callsign VARCHAR(32) default '', name VARCHAR(32) default '', aprsSuffix VARCHAR(3) default '', aprsBeacon VARCHAR(100) default 'DMR terminal', aprsSymbol INTEGER default 62, hasSendAprs INTEGER default 0, messageStore INTEGER default 1, email VARCHAR(100) default '', login VARCHAR(50) default '', password VARCHAR(50) default '', lastAprsTime INTEGER default 0, madeChange INTEGER default 0, city VARCHAR(32) default '', state VARCHAR(32) default '', country VARCHAR(32) default '', radio VARCHAR(32) default '', homeRepeaterId VARCHAR(32) default '', remarks VARCHAR(32) default '')");
+		sprintf(SQLQUERY,"CREATE TABLE callsigns (radioId INTEGER default 0, callsign VARCHAR(32) default '', name VARCHAR(32) default '', aprsSuffix VARCHAR(3) default '-9', aprsBeacon VARCHAR(100) default 'DMR terminal', aprsSymbol INTEGER default 62, hasSendAprs INTEGER default 0, messageStore INTEGER default 1, email VARCHAR(100) default '', login VARCHAR(50) default '', password VARCHAR(50) default '', lastAprsTime INTEGER default 0, madeChange INTEGER default 0, city VARCHAR(32) default '', state VARCHAR(32) default '', country VARCHAR(32) default '', radio VARCHAR(32) default '', homeRepeaterId VARCHAR(32) default '', remarks VARCHAR(32) default '')");
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table callsigns created");
 		}
