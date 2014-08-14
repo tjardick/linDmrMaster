@@ -336,6 +336,20 @@ void *dmrListener(void *f){
 							//break;
 						}
 						break;
+
+						case 0x41: //V6 of Hytera repeater firmware sends data header with packet type 41 iso 1
+
+                                                if (slotType[slot] == 0x4444){  //Data header
+	                                                memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+        	                                        bits = convertToBits(dmrPacket); //convert it to bits
+                                                        repeaterList[repPos].sending[slot] = true;
+                                                        receivingData[slot] = true;
+                                                        dataBlocks[slot] = 0;
+                                                        BPTC1969decode[slot] = decodeBPTC1969(bits);
+                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
+                                                        break;
+                                                }
+
 						
 						case 0x01:
 						if (slotType[slot] == 0x3333){  //CSBK (first slot type for data where we can see src and dst)
@@ -347,17 +361,17 @@ void *dmrListener(void *f){
 							break;
 						}
 						
-						memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
-						bits = convertToBits(dmrPacket); //convert it to bits
-						
-						if (slotType[slot] == 0x4444){  //Data header
-							repeaterList[repPos].sending[slot] = true;
-							receivingData[slot] = true;
-							dataBlocks[slot] = 0;
-							BPTC1969decode[slot] = decodeBPTC1969(bits);
-							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
-							break;
-						}
+                                                memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+                                                bits = convertToBits(dmrPacket); //convert it to bits
+
+                                                if (slotType[slot] == 0x4444){  //Data header
+                                                        repeaterList[repPos].sending[slot] = true;
+                                                        receivingData[slot] = true;
+                                                        dataBlocks[slot] = 0;
+                                                        BPTC1969decode[slot] = decodeBPTC1969(bits);
+                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
+                                                        break;
+                                                }
 
 						if (slotType[slot] == 0x5555 && !receivingData[slot]){ // 1/2 rate data without valid header
 							block[slot] = true;
