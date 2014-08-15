@@ -164,10 +164,10 @@ unsigned char *  decodeThreeQuarterRate(bool bits[264]){
 		for (i=0;i<8;i++){
 			if(decodedBinary[a+i] == true) bb[x] = bb[x] + (char)(128 / pow(2,i));
 		}
-		printf("(%02X)%c",bb[x],bb[x]);
+		//printf("(%02X)%c",bb[x],bb[x]);
 		x++;
 	}
-	printf("\n");
+	//printf("\n");
 	return bb;
 }
 

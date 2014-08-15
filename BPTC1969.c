@@ -23,7 +23,7 @@
 
 #include "master_server.h"
 
-struct BPTC1969{
+struct header{
 	bool responseRequested;
         int dataPacketFormat;
         int sapId;
@@ -107,14 +107,14 @@ bool * extractPayload(bool * deInterData){
 }
 
 
-struct BPTC1969 decodeBPTC1969(bool bits[264]){
+struct header decodeDataHeader(bool bits[264]){
 
         bool *infoBits; //196 info bits
         bool *deInterleavedBits; //196 bits
         static bool *payloadBits; //96  bits
         int blocksToFollow=0,a;
         unsigned char dpf=0,sap=0,bitPadding=0;
-	struct BPTC1969 BPTC1969decode;
+	struct header headerDecode;
 
         infoBits = extractInfo(bits);
         deInterleavedBits = deInterleave(infoBits);
@@ -126,11 +126,11 @@ struct BPTC1969 decodeBPTC1969(bool bits[264]){
         }
         printf("\n");*/
         if(*(payloadBits+1) == 1){
-		BPTC1969decode.responseRequested = true;
+		headerDecode.responseRequested = true;
 		 //syslog(LOG_NOTICE,"response requested"); 
 	}
 	else{
-		BPTC1969decode.responseRequested = false;
+		headerDecode.responseRequested = false;
 		//syslog(LOG_NOTICE,"NO response requested");
 	}
 
@@ -138,7 +138,7 @@ struct BPTC1969 decodeBPTC1969(bool bits[264]){
                 if(*(payloadBits + a) == true) dpf = dpf + (char)(8 / pow(2,a-4));
         }
         //syslog(LOG_NOTICE,"Data Packet Format: ");
-	BPTC1969decode.dataPacketFormat = dpf;
+	headerDecode.dataPacketFormat = dpf;
         switch (dpf){
                 case 0:
                 //syslog(LOG_NOTICE,"Unified Data Transport\n");
@@ -174,7 +174,7 @@ struct BPTC1969 decodeBPTC1969(bool bits[264]){
         }
 		
 	//syslog(LOG_NOTICE,"SAP id: ");
-	BPTC1969decode.sapId = sap;
+	headerDecode.sapId = sap;
         switch (sap){
 
                 case 0:
@@ -210,7 +210,7 @@ struct BPTC1969 decodeBPTC1969(bool bits[264]){
                 for(a=12;a<16;a++){//only AB in 2nd octet
                          if(*(payloadBits + a) == true) blocksToFollow = blocksToFollow + (char)(8 / pow(2,a-12));
                 }
-                BPTC1969decode.appendBlocks = blocksToFollow;
+                headerDecode.appendBlocks = blocksToFollow;
 		//syslog(LOG_NOTICE,"Appended blocks : %i\n",blocksToFollow);
 
                 for(a=72;a<80;a++){
@@ -218,5 +218,31 @@ struct BPTC1969 decodeBPTC1969(bool bits[264]){
                 }
         }
 
-        return BPTC1969decode;
+        return headerDecode;
+}
+
+
+unsigned char *  decodeHalfRate(bool bits[264]){
+
+        bool *infoBits; //196 info bits
+        bool *deInterleavedBits; //196 bits
+        static bool *payloadBits; //96  bits
+	int i,a,x;
+        static unsigned char bb[12] = {0};
+
+        infoBits = extractInfo(bits);
+        deInterleavedBits = deInterleave(infoBits);
+        payloadBits = extractPayload(deInterleavedBits);
+
+
+        for (a=0;a<96;a=a+8){
+                bb[x] = 0;
+                for (i=0;i<8;i++){
+                        if(payloadBits[a+i] == true) bb[x] = bb[x] + (char)(128 / pow(2,i));
+                }
+                //printf("(%02X)%c",bb[x],bb[x]);
+                x++;
+        }
+        //printf("\n");
+        return bb;
 }

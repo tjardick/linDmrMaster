@@ -59,7 +59,7 @@ struct allow{
 	bool isRange;
 };
 
-struct BPTC1969{
+struct header{
 	bool responseRequested;
         int dataPacketFormat;
         int sapId;
@@ -69,11 +69,13 @@ struct BPTC1969{
 void delRdacRepeater();
 void delRepeater();
 bool * convertToBits();
-struct BPTC1969 decodeBPTC1969();
+struct header decodeDataHeader();
 unsigned char *  decodeThreeQuarterRate();
+unsigned char *  decodeHalfRate();
 void decodeHyteraGpsTriggered();
 void decodeHyteraGpsCompressed();
 void decodeHyteraGpsButton();
+void decodeHyteraRrs();
 
 struct allow checkTalkGroup(int dstId, int slot, int callType){
 	struct allow toSend = {0};
@@ -233,14 +235,16 @@ void *dmrListener(void *f){
 	unsigned char webUserInfo[100];
 	unsigned char dmrPacket[33];
 	bool *bits;
-	struct BPTC1969 BPTC1969decode[3];
+	struct header headerDecode[3];
 	int dataBlocks[3] = {0};
 	unsigned char *decoded34[3];
+	unsigned char *decoded12[3];
 	unsigned char decodedString[3][300];
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
 	unsigned char gpsStringButtonHyt[4] = {0x08,0xA0,0x02,0x00};
 	unsigned char gpsCompressedStringHyt[4] = {0x01,0xD0,0x03,0x00};
+	unsigned char rrsHyt[4] = {0x00,0x11,0x00,0x03};
 
 	syslog(LOG_NOTICE,"DMR thread for port %i started",baseDmrPort + repPos);
 	sockfd=socket(AF_INET,SOCK_DGRAM,0);
@@ -345,8 +349,8 @@ void *dmrListener(void *f){
                                                         repeaterList[repPos].sending[slot] = true;
                                                         receivingData[slot] = true;
                                                         dataBlocks[slot] = 0;
-                                                        BPTC1969decode[slot] = decodeBPTC1969(bits);
-                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
+                                                        headerDecode[slot] = decodeDataHeader(bits);
+                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
                                                         break;
                                                 }
 
@@ -368,8 +372,8 @@ void *dmrListener(void *f){
                                                         repeaterList[repPos].sending[slot] = true;
                                                         receivingData[slot] = true;
                                                         dataBlocks[slot] = 0;
-                                                        BPTC1969decode[slot] = decodeBPTC1969(bits);
-                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],BPTC1969decode[slot].appendBlocks);
+                                                        headerDecode[slot] = decodeDataHeader(bits);
+                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
                                                         break;
                                                 }
 
@@ -384,13 +388,19 @@ void *dmrListener(void *f){
 							break;
 						}
 						if (slotType[slot] == 0x5555 && receivingData[slot]){ // 1/2 rate data continuation
+							decoded12[slot] = decodeHalfRate(bits);
+							memcpy(decodedString[slot]+(12*dataBlocks[slot]),decoded12[slot],12);
 							dataBlocks[slot]++;
-							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
+							if(headerDecode[slot].appendBlocks == dataBlocks[slot]){
 								receivingData[slot] = false;
 								releaseBlock[slot] = true;
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
+								if(dstId[slot] == rrsGpsId){
+									if(memcmp(decodedString[slot] + 1,rrsHyt,4) == 0) decodeHyteraRrs(repeaterList[repPos],decodedString[slot]);
+								}
+								memset(decodedString[slot],0,300);
 							}
 							break;
 						}
@@ -398,7 +408,7 @@ void *dmrListener(void *f){
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
-							if(BPTC1969decode[slot].appendBlocks == dataBlocks[slot]){
+							if(headerDecode[slot].appendBlocks == dataBlocks[slot]){
 								releaseBlock[slot] = true;
 								receivingData[slot] = false;
 								dataBlocks[slot] = 0;

@@ -61,3 +61,11 @@ void decodeHyteraGpsCompressed(int radioId,struct repeater repeater, unsigned ch
 
 	syslog(LOG_NOTICE,"[%s]Compressed GPS data(Hytera) not decoding",repeater.callsign);
 }
+
+void decodeHyteraRrs(struct repeater repeater, unsigned char data[300]){
+
+	int srcId = 0;
+
+	srcId = data[8] << 16 | data[9] << 8 | data[10];
+	syslog(LOG_NOTICE,"[%s]Hytera RADIO REGISTER from %i",repeater.callsign,srcId);
+}
