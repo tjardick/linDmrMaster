@@ -42,13 +42,14 @@ void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char d
 
         struct gpsCoordinates gpsData = {0};
 
-        memcpy(gpsData.latitude,data+33,3);
-        memcpy(gpsData.latitude+3,data+38,4);
-        memcpy(gpsData.latitude+7,data+32,1);
-        memcpy(gpsData.longitude,data+45,8);
-        memcpy(gpsData.longitude+8,data+44,1);
-        memcpy(gpsData.speed,data+57,3);
-        memcpy(gpsData.heading,data+60,3);
+        memcpy(gpsData.latitude,data+35,1);
+        memcpy(gpsData.latitude+1,data+38,6);
+        memcpy(gpsData.latitude+7,data+34,1);
+        memcpy(gpsData.longitude,data+47,6);
+        memcpy(gpsData.longitude+6,data+56,2);
+        memcpy(gpsData.longitude+8,data+46,1);
+        memcpy(gpsData.speed,data+59,3);
+        memcpy(gpsData.heading,data+62,3);
 
         syslog(LOG_NOTICE,"[%s]Decoded GPS data button(Hytera): LAT(%s) LONG(%s) SPEED(%s) HEADING(%s)",repeater.callsign,gpsData.latitude,gpsData.longitude,gpsData.speed,gpsData.heading);
 
