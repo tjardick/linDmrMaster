@@ -45,8 +45,8 @@ void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char d
         memcpy(gpsData.latitude,data+35,1);
         memcpy(gpsData.latitude+1,data+38,6);
         memcpy(gpsData.latitude+7,data+34,1);
-        memcpy(gpsData.longitude,data+47,6);
-        memcpy(gpsData.longitude+6,data+56,2);
+        memcpy(gpsData.longitude,data+47,7);
+        memcpy(gpsData.longitude+7,data+56,1);
         memcpy(gpsData.longitude+8,data+46,1);
         memcpy(gpsData.speed,data+59,3);
         memcpy(gpsData.heading,data+62,3);
