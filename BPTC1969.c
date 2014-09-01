@@ -227,7 +227,7 @@ unsigned char *  decodeHalfRate(bool bits[264]){
         bool *infoBits; //196 info bits
         bool *deInterleavedBits; //196 bits
         static bool *payloadBits; //96  bits
-	int i,a,x;
+	int i,a,x=0;
         static unsigned char bb[12] = {0};
 
         infoBits = extractInfo(bits);
