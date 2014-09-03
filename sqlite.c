@@ -143,6 +143,17 @@ int initDatabase(sqlite3 *db){
 			return 0;
 		}
 	}
+
+	if (!isTableExisting(db,"rrs")){
+		sprintf(SQLQUERY,"CREATE TABLE rrs (radioId INTEGER default 0 PRIMARY KEY, callsign VARCHAR(32) default '',name VARCHAR(32) default '', registerTime VARCHAR(20) default '1970-01-01 00:00:00', onRepeater VARCHAR(32) default '')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table rrs created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}	
 	
 	//check for new fields added later in development
 	if (!isFieldExisting(db,"repeaters","language")){

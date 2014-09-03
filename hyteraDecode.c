@@ -20,6 +20,9 @@
 #include "master_server.h"
 void sendAprs();
 int checkCoordinates();
+sqlite3 *openDatabase();
+void closeDatabase();
+
 
 void decodeHyteraGpsTriggered(int radioId,struct repeater repeater, unsigned char data[300]){
 
@@ -63,9 +66,66 @@ void decodeHyteraGpsCompressed(int radioId,struct repeater repeater, unsigned ch
 }
 
 void decodeHyteraRrs(struct repeater repeater, unsigned char data[300]){
+	sqlite3 *dbase;
+	sqlite3_stmt *stmt;
+	unsigned char callsign[33];
+	char SQLQUERY[200];
+
 
 	int srcId = 0;
 
 	srcId = data[8] << 16 | data[9] << 8 | data[10];
-	syslog(LOG_NOTICE,"[%s]Hytera RADIO REGISTER from %i",repeater.callsign,srcId);
+
+	dbase = openDatabase();
+	sprintf(SQLQUERY,"SELECT callsign FROM callsigns WHERE radioId = %i",srcId);
+	if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
+		if (sqlite3_step(stmt) == SQLITE_ROW){
+			sprintf(callsign,"%s",sqlite3_column_text(stmt,0));
+			sqlite3_finalize(stmt);
+
+		}
+		else{
+			sqlite3_finalize(stmt);
+			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+		}
+	}
+	else{
+		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
+		closeDatabase(dbase);
+	}
+
+	syslog(LOG_NOTICE,"[%s]Hytera RADIO REGISTER from %i %s",repeater.callsign,srcId,callsign);
+}
+
+void decodeHyteraOffRrs(struct repeater repeater, unsigned char data[300]){
+	sqlite3 *dbase;
+	sqlite3_stmt *stmt;
+	unsigned char callsign[33];
+	char SQLQUERY[200];
+
+	int srcId = 0;
+
+	srcId = data[8] << 16 | data[9] << 8 | data[10];
+
+	dbase = openDatabase();
+	sprintf(SQLQUERY,"SELECT callsign FROM callsigns WHERE radioId = %i",srcId);
+	if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
+		if (sqlite3_step(stmt) == SQLITE_ROW){
+			sprintf(callsign,"%s",sqlite3_column_text(stmt,0));
+			sqlite3_finalize(stmt);
+
+		}
+		else{
+			sqlite3_finalize(stmt);
+			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+		}
+	}
+	else{
+		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
+		closeDatabase(dbase);
+	}
+
+	syslog(LOG_NOTICE,"[%s]Hytera RADIO OFFLINE from %i %s",repeater.callsign,srcId,callsign);
 }

@@ -245,6 +245,7 @@ void *dmrListener(void *f){
 	unsigned char gpsStringButtonHyt[4] = {0x08,0xA0,0x02,0x00};
 	unsigned char gpsCompressedStringHyt[4] = {0x01,0xD0,0x03,0x00};
 	unsigned char rrsHyt[4] = {0x00,0x11,0x00,0x03};
+	unsigned char rrsOffHyt[4] = {0x00,0x11,0x00,0x01};
 
 	syslog(LOG_NOTICE,"DMR thread for port %i started",baseDmrPort + repPos);
 	sockfd=socket(AF_INET,SOCK_DGRAM,0);
@@ -399,6 +400,7 @@ void *dmrListener(void *f){
 								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 								if(dstId[slot] == rrsGpsId){
 									if(memcmp(decodedString[slot] + 1,rrsHyt,4) == 0) decodeHyteraRrs(repeaterList[repPos],decodedString[slot]);
+									if(memcmp(decodedString[slot] + 1,rrsOffHyt,4) == 0) decodeHyteraOffRrs(repeaterList[repPos],decodedString[slot]);
 								}
 								memset(decodedString[slot],0,300);
 							}
