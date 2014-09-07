@@ -89,10 +89,15 @@ void decodeHyteraRrs(struct repeater repeater, unsigned char data[300]){
 		else{
 			sqlite3_finalize(stmt);
 			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+			return;
 		}
 	}
 	else{
 		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
+		closeDatabase(dbase);
+		return;
+
 	}
 
         time_t now = time(NULL);
@@ -127,14 +132,18 @@ void decodeHyteraOffRrs(struct repeater repeater, unsigned char data[300]){
 		else{
 			sqlite3_finalize(stmt);
 			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+			return;
 		}
 	}
 	else{
 		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
 	}
 	sprintf(SQLQUERY,"DELETE FROM rrs where radioId = %i",srcId);
-	if (!sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
 		syslog(LOG_NOTICE,"Failed to delete rrs in database: %s",sqlite3_errmsg(dbase));
+		closeDatabase(dbase);
+		return;
 	}
 
 	syslog(LOG_NOTICE,"[%s]Hytera RADIO OFFLINE from %i %s",repeater.callsign,srcId,callsign);
