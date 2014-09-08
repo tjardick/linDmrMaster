@@ -122,7 +122,6 @@ void *Service_Request(void *f) {
 		}
 	}
     /*  Output HTTP response headers if we have a full request  */
-
     if ( reqinfo.type == FULL )
 	Output_HTTP_Headers(conn, &reqinfo);
     /*  Service the HTTP request  */
