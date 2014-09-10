@@ -70,9 +70,11 @@ void sendAprsBeacon(char callsign[10],char pass[6],char loc[20],char phg[7],char
 	int sockfd;
 
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s>APRS,%s,qAR,%s:!%s&%s%s",callsign,pass,callsign,callsign,callsign,loc,phg,text);
-	//openAprsSock();
-	//send(sockfd,toSend,strlen(toSend),0);
-	//close(sockfd);
+        if(!send(aprsSockFd,toSend,strlen(toSend),0)){
+                close(aprsSockFd);
+                openAprsSock();
+                send(aprsSockFd,toSend,strlen(toSend),0);
+        }
 
 }
 

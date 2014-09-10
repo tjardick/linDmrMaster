@@ -62,6 +62,7 @@ void *dmrListener();
 void *rdacListener();
 void *sMasterThread();
 void *webServerListener();
+void *scheduler();
 
 void discard(struct sockaddr_in address){
 	int i;
@@ -655,8 +656,8 @@ int main(int argc, char**argv)
 		return 0;
 	}
 	closeDatabase(db);
-	//Start webserver thread
-	pthread_create(&thread, NULL, webServerListener,NULL);
+	//Start scheduler thread
+	pthread_create(&thread, NULL, scheduler,NULL);
 
     for(;;){
 		restart = 0;

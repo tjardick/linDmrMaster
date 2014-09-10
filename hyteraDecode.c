@@ -103,7 +103,7 @@ void decodeHyteraRrs(struct repeater repeater, unsigned char data[300]){
         time_t now = time(NULL);
         struct tm *t = localtime(&now);
         strftime(timeStamp,sizeof(timeStamp),"%Y-%m-%d %H:%M:%S",t);
-	sprintf(SQLQUERY,"REPLACE into rrs (radioId,callsign,name,registerTime,onRepeater) VALUES (%i,'%s','%s','%s','%s')",srcId,callsign,name,timeStamp,repeater.callsign);
+	sprintf(SQLQUERY,"REPLACE into rrs (radioId,callsign,name,registerTime,onRepeater,unixTime) VALUES (%i,'%s','%s','%s','%s',%lu)",srcId,callsign,name,timeStamp,repeater.callsign,now);
 	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
 		syslog(LOG_NOTICE,"Failed to update rrs in database: %s",sqlite3_errmsg(dbase));
 	}

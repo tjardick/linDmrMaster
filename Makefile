@@ -42,7 +42,7 @@ LibPath                := "$(LibraryPathSwitch)."
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects=$(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IntermediateDirectory)/webserv$(ObjectSuffix) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) $(IntermediateDirectory)/decode34Rate$(ObjectSuffix) $(IntermediateDirectory)/hyteraDecode$(ObjectSuffix) $(IntermediateDirectory)/aprs$(ObjectSuffix)
+Objects=$(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IntermediateDirectory)/webserv$(ObjectSuffix) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) $(IntermediateDirectory)/decode34Rate$(ObjectSuffix) $(IntermediateDirectory)/hyteraDecode$(ObjectSuffix) $(IntermediateDirectory)/aprs$(ObjectSuffix)  $(IntermediateDirectory)/scheduler$(ObjectSuffix)
 
 ##
 ## Main Build Targets 
@@ -166,6 +166,14 @@ $(IntermediateDirectory)/aprs$(DependSuffix): aprs.c
 $(IntermediateDirectory)/aprs$(PreprocessSuffix): aprs.c
 	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/aprs$(PreprocessSuffix) "aprs.c"
 
+$(IntermediateDirectory)/scheduler$(ObjectSuffix): scheduler.c $(IntermediateDirectory)/scheduler$(DependSuffix)
+	$(C_CompilerName) $(SourceSwitch) "scheduler.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/scheduler$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/scheduler$(DependSuffix): scheduler.c
+	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/scheduler$(ObjectSuffix) -MF$(IntermediateDirectory)/scheduler$(DependSuffix) -MM "scheduler.c"
+
+$(IntermediateDirectory)/scheduler$(PreprocessSuffix): scheduler.c
+	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/scheduler$(PreprocessSuffix) "scheduler.c"
+
 
 -include $(IntermediateDirectory)/*$(DependSuffix)
 ##
@@ -211,6 +219,9 @@ clean:
 	$(RM) $(IntermediateDirectory)/aprs$(ObjectSuffix)
 	$(RM) $(IntermediateDirectory)/aprs$(DependSuffix)
 	$(RM) $(IntermediateDirectory)/aprs$(PreprocessSuffix)
+	$(RM) $(IntermediateDirectory)/scheduler$(ObjectSuffix)
+	$(RM) $(IntermediateDirectory)/scheduler$(DependSuffix)
+	$(RM) $(IntermediateDirectory)/scheduler$(PreprocessSuffix)
 
 	$(RM) $(OutputFile)
 
