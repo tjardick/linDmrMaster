@@ -76,6 +76,8 @@ void decodeHyteraGpsTriggered();
 void decodeHyteraGpsCompressed();
 void decodeHyteraGpsButton();
 void decodeHyteraRrs();
+sqlite3 *openDatabase();
+void closeDatabase();
 
 struct allow checkTalkGroup(int dstId, int slot, int callType){
 	struct allow toSend = {0};
@@ -207,6 +209,43 @@ void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in ad
 	}
 }
 
+
+void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int callType){
+        char SQLQUERY[200];
+        sqlite3 *dbase;
+        sqlite3_stmt *stmt;
+	unsigned char callsign[33] = "";
+	unsigned char callGroup[16];
+
+	if (callType = 0) sprintf(callGroup ,"group"); else sprintf(callGroup,"private");
+        dbase = openDatabase();
+        sprintf(SQLQUERY,"SELECT callsign FROM callsigns WHERE radioId = %i",srcId);
+        if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
+                if (sqlite3_step(stmt) == SQLITE_ROW){
+                        sprintf(callsign,"%s",sqlite3_column_text(stmt,0));
+                        sqlite3_finalize(stmt);
+
+                }
+                else{
+                        sqlite3_finalize(stmt);
+                        closeDatabase(dbase);
+                        return;
+                }
+        }
+        else{
+                closeDatabase(dbase);
+                return;
+
+        }
+
+	sprintf(SQLQUERY,"REPLACE into traffic (senderId,senderCallsign,targetId,channel,serviceType,callType,timeStamp) VALUES (%i,'%s',%i,%i,'%s','%s',%lu)",srcId,callsign,dstId,slot,serviceType,callGroup,time(NULL));
+        if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+                syslog(LOG_NOTICE,"Failed to update traffic table: %s",sqlite3_errmsg(dbase));
+        }
+        closeDatabase(dbase);
+
+}
+
 void *dmrListener(void *f){
 	int sockfd,n,i,rc,ii;
 	struct sockaddr_in servaddr,cliaddr;
@@ -240,6 +279,7 @@ void *dmrListener(void *f){
 	unsigned char *decoded34[3];
 	unsigned char *decoded12[3];
 	unsigned char decodedString[3][300];
+
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
 	unsigned char gpsStringButtonHyt[4] = {0x08,0xA0,0x02,0x00};
@@ -314,8 +354,8 @@ void *dmrListener(void *f){
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							callType[slot] = buffer[TYP_OFFSET1];
 							repeaterList[repPos].sending[slot] = true;
-							sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
 							if (sMaster.online){
+								sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
 								sendto(sMaster.sockfd,webUserInfo,strlen(webUserInfo),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 							}
 							if (dstId[slot] == echoId){
@@ -401,6 +441,10 @@ void *dmrListener(void *f){
 								if(dstId[slot] == rrsGpsId){
 									if(memcmp(decodedString[slot] + 1,rrsHyt,4) == 0) decodeHyteraRrs(repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 1,rrsOffHyt,4) == 0) decodeHyteraOffRrs(repeaterList[repPos],decodedString[slot]);
+									logTraffic(srcId[slot],dstId[slot],slot,"rrs",callType[slot]);
+								}
+								else{
+									logTraffic(srcId[slot],dstId[slot],slot,"data 1/2",callType[slot]);
 								}
 								memset(decodedString[slot],0,300);
 							}
@@ -420,6 +464,10 @@ void *dmrListener(void *f){
 									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
+									logTraffic(srcId[slot],dstId[slot],slot,"gps",callType[slot]);
+								}
+								else{
+									logTraffic(srcId[slot],dstId[slot],slot,"data 3/4",callType[slot]);
 								}
 								memset(decodedString[slot],0,300);
 							}
@@ -431,6 +479,7 @@ void *dmrListener(void *f){
 							dmrState[slot] = IDLE;
 							repeaterList[repPos].sending[slot] = false;
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i",repeaterList[repPos].callsign,slot);
+							logTraffic(srcId[slot],dstId[slot],slot,"voice",callType[slot]);
 							if (block[slot] == true){
 								syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
 								releaseBlock[slot] = true;
@@ -475,12 +524,16 @@ void *dmrListener(void *f){
 			}
 			time(&timeNow);
 			if ((repeaterList[repPos].sending[1] && dmrState[1] != IDLE) || receivingData[1]){
-				if (dmrState[1] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 1",repeaterList[repPos].callsign);
+				if (dmrState[1] == VOICE){
+					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 1",repeaterList[repPos].callsign);
+					logTraffic(srcId[1],dstId[1],slot,"voice",callType[1]);
+				}
 				if (receivingData[1]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 1",repeaterList[repPos].callsign);
 					dataBlocks[1] = 0;
 					receivingData[1] = false;
 					memset(decodedString[1],0,300);
+					logTraffic(srcId[1],dstId[1],slot,"data",callType[1]);
 				}
 				dmrState[1] = IDLE;
 				repeaterList[repPos].sending[1] = false;
@@ -489,12 +542,16 @@ void *dmrListener(void *f){
 				syslog(LOG_NOTICE,"[%s]Slot 1 IDLE",repeaterList[repPos].callsign);
 			}
 			if ((repeaterList[repPos].sending[2] && dmrState[2] != IDLE) || receivingData[2]){
-				if (dmrState[2] == VOICE) syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
+				if (dmrState[2] == VOICE){
+					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
+					logTraffic(srcId[2],dstId[2],slot,"voice",callType[2]);
+				}
 				if (receivingData[2]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					dataBlocks[2] = 0;
 					receivingData[2] = false;
 					memset(decodedString[2],0,300);
+					logTraffic(srcId[2],dstId[2],slot,"data",callType[2]);
 				}
 				dmrState[2] = IDLE;
 				repeaterList[repPos].sending[2] = false;

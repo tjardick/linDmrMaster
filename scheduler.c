@@ -18,3 +18,47 @@
 */
 
 #include "master_server.h"
+
+void sendAprsBeacon();
+sqlite3 *openDatabase();
+void closeDatabase();
+
+void *scheduler(){
+	time_t timeNow,beaconTime=0;
+	int i;
+	char SQLQUERY[200];
+        sqlite3 *dbase;
+        sqlite3_stmt *stmt;
+
+	syslog(LOG_NOTICE,"Scheduler thread started");
+	for(;;){
+		sleep(120);
+		time(&timeNow);
+		//Send APRS beacons
+		if (difftime(timeNow,beaconTime) > 1800){
+			for(i=0;i<highestRepeater;i++){
+				if (repeaterList[i].id != 0 && repeaterList[i].dmrOnline){
+					sleep(1);
+					sendAprsBeacon(repeaterList[i].callsign,repeaterList[i].aprsPass,repeaterList[i].geoLocation,repeaterList[i].aprsPHG,repeaterList[i].aprsBeacon);
+				}
+			}
+			time(&beaconTime);
+			syslog(LOG_NOTICE,"Send aprs beacons for connected repeaters");
+		}
+                time(&timeNow);
+                //Cleanup registration database
+        	dbase = openDatabase();
+                sprintf(SQLQUERY,"DELETE FROM rrs WHERE %lu-unixTime > 1900",time(NULL));
+		syslog(LOG_NOTICE,"RRS cleanup query: %s",SQLQUERY);
+	        if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+        	        syslog(LOG_NOTICE,"Failed to cleanup RRS database: %s",sqlite3_errmsg(dbase));
+	        }
+		//Delete old traffic data
+                sprintf(SQLQUERY,"DELETE FROM traffic WHERE %lu-timeStamp > 86400",time(NULL));
+                if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+                        syslog(LOG_NOTICE,"Failed to cleanup RRS database: %s",sqlite3_errmsg(dbase));
+                }
+
+		closeDatabase(dbase);
+	}
+}
