@@ -245,6 +245,17 @@ int initDatabase(sqlite3 *db){
                 }
         }
 
-		
+        if (!isFieldExisting(db,"rrs","unixTime")){
+                sprintf(SQLQUERY,"ALTER TABLE rrs ADD COLUMN unixTime INT default ''");
+                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+                        syslog(LOG_NOTICE,"field unixTime in rrs created");
+                }
+                else{
+                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+                        return 0;
+                }
+        }
+
+
 	return 1;
 }
