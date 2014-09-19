@@ -451,7 +451,7 @@ void *dmrListener(void *f){
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
-								if(dstId[slot] == rrsGpsId){
+								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5055 && dstId[slot] < 5061)){
 									if(memcmp(decodedString[slot] + 1,rrsHyt,4) == 0) decodeHyteraRrs(repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 1,rrsOffHyt,4) == 0) decodeHyteraOffRrs(repeaterList[repPos],decodedString[slot]);
 									logTraffic(srcId[slot],dstId[slot],slot,"RRS",callType[slot],repeaterList[repPos].callsign);
@@ -473,9 +473,9 @@ void *dmrListener(void *f){
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]3/4 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
-								if(dstId[slot] == rrsGpsId){
-									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],repeaterList[repPos],decodedString[slot]);
-									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],repeaterList[repPos],decodedString[slot]);
+								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5055 && dstId[slot] < 5061)){
+									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],dstId[slot],repeaterList[repPos],decodedString[slot]);
+									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],dstId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
 									logTraffic(srcId[slot],dstId[slot],slot,"GPS",callType[slot],repeaterList[repPos].callsign);
 								}

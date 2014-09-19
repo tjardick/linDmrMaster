@@ -78,7 +78,7 @@ void sendAprsBeacon(char callsign[10],char pass[6],char loc[20],char phg[7],char
 
 }
 
-void sendAprs(struct gpsCoordinates gpsData, int radioId, struct repeater repeater){
+void sendAprs(struct gpsCoordinates gpsData, int radioId,int destId, struct repeater repeater){
 	char toSend[300];
 	char timeString[7];
 	char SQLQUERY[200];
@@ -124,6 +124,29 @@ void sendAprs(struct gpsCoordinates gpsData, int radioId, struct repeater repeat
 	closeDatabase(dbase);
 	sprintf(aprsCor,"%s/%s>%s/%s",gpsData.latitude,gpsData.longitude,gpsData.heading,gpsData.speed);
 	aprsCor[18] = radioIdent.aprsSymbol;
+
+	//overwrite symbol if destId != 500
+	switch(destId){
+
+	case 5055:
+	aprsCor[18] = 110;
+	break;
+	case 5056:
+	aprsCor[18] = 59;
+	break;
+	case 5057:
+	aprsCor[18] = 91;
+	break;
+	case 5058:
+	aprsCor[18] = 82;
+	break;
+	case 5059:
+	aprsCor[18] = 62;
+	break;
+        case 5060:
+        aprsCor[18] = 45;
+        break;
+	}
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s%s>APRS,%s,qAR,%s:!%s %s\n",repeater.callsign,repeater.aprsPass,radioIdent.callsign,radioIdent.aprsSuffix,repeater.callsign,repeater.callsign,aprsCor,radioIdent.aprsBeacon);
 
 	if(!send(aprsSockFd,toSend,strlen(toSend),0)){

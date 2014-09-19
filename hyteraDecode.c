@@ -24,7 +24,7 @@ sqlite3 *openDatabase();
 void closeDatabase();
 
 
-void decodeHyteraGpsTriggered(int radioId,struct repeater repeater, unsigned char data[300]){
+void decodeHyteraGpsTriggered(int radioId,int destId,struct repeater repeater, unsigned char data[300]){
 
 	struct gpsCoordinates gpsData = {0};
 
@@ -38,10 +38,10 @@ void decodeHyteraGpsTriggered(int radioId,struct repeater repeater, unsigned cha
 
 	syslog(LOG_NOTICE,"[%s]Decoded GPS data triggered(Hytera): LAT(%s) LONG(%s) SPEED(%s) HEADING(%s)",repeater.callsign,gpsData.latitude,gpsData.longitude,gpsData.speed,gpsData.heading);
 	
-	if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,repeater);
+	if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,destId,repeater);
 }
 
-void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char data[300]){
+void decodeHyteraGpsButton(int radioId,int destId,struct repeater repeater, unsigned char data[300]){
 
         struct gpsCoordinates gpsData = {0};
 
@@ -56,7 +56,7 @@ void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char d
 
         syslog(LOG_NOTICE,"[%s]Decoded GPS data button(Hytera): LAT(%s) LONG(%s) SPEED(%s) HEADING(%s)",repeater.callsign,gpsData.latitude,gpsData.longitude,gpsData.speed,gpsData.heading);
 
-        if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,repeater);
+        if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,destId,repeater);
 }
 
 
