@@ -246,7 +246,7 @@ int initDatabase(sqlite3 *db){
         }
 
         if (!isFieldExisting(db,"rrs","unixTime")){
-                sprintf(SQLQUERY,"ALTER TABLE rrs ADD COLUMN unixTime INT default ''");
+                sprintf(SQLQUERY,"ALTER TABLE rrs ADD COLUMN unixTime INT default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
                         syslog(LOG_NOTICE,"field unixTime in rrs created");
                 }
@@ -256,6 +256,16 @@ int initDatabase(sqlite3 *db){
                 }
         }
 
+        if (!isFieldExisting(db,"traffic","senderName")){
+                sprintf(SQLQUERY,"ALTER TABLE traffic ADD COLUMN senderName varchar(32) default '' ");
+                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+                        syslog(LOG_NOTICE,"field senderName in traffic created");
+                }
+                else{
+                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+                        return 0;
+                }
+        }
 
 	return 1;
 }
