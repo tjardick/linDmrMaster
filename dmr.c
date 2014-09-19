@@ -218,7 +218,7 @@ void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int c
 	unsigned char name[33] = "";
 	unsigned char callGroup[16];
 
-	if (callType == 0) sprintf(callGroup ,"Group"); else sprintf(callGroup,"Private");
+	if (callType == 1) sprintf(callGroup ,"Group"); else sprintf(callGroup,"Private");
         dbase = openDatabase();
         sprintf(SQLQUERY,"SELECT callsign,name FROM callsigns WHERE radioId = %i",srcId);
         if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
@@ -247,6 +247,13 @@ void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int c
                 syslog(LOG_NOTICE,"Failed to update traffic table: %s",sqlite3_errmsg(dbase));
 		syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
         }
+	if(strcmp(serviceType,"Voice")== 0){
+		sprintf(SQLQUERY,"REPLACE into voiceTraffic (senderId,senderCallsign,senderName,targetId,channel,serviceType,callType,timeStamp,onRepeater) VALUES (%i,'%s','%s',%i,%i,'%s','%s',%lu,'%s')",srcId,callsign,name,dstId,slot,serviceType,callGroup,time(NULL),repeater);
+        	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+                	syslog(LOG_NOTICE,"Failed to update voiceTraffic table: %s",sqlite3_errmsg(dbase));
+			syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+        	}
+	}
         closeDatabase(dbase);
 
 }
