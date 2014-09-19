@@ -49,7 +49,6 @@ void *scheduler(){
                 //Cleanup registration database
         	dbase = openDatabase();
                 sprintf(SQLQUERY,"DELETE FROM rrs WHERE %lu-unixTime > 1900",time(NULL));
-		syslog(LOG_NOTICE,"RRS cleanup query: %s",SQLQUERY);
 	        if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
         	        syslog(LOG_NOTICE,"Failed to cleanup RRS database: %s",sqlite3_errmsg(dbase));
 	        }
