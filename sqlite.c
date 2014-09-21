@@ -153,8 +153,31 @@ int initDatabase(sqlite3 *db){
 			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
 			return 0;
 		}
-	}	
-	
+	}
+
+	if (!isTableExisting(db,"traffic")){
+		sprintf(SQLQUERY,"CREATE TABLE traffic (senderId int default 0 PRIMARY KEY,senderCallsign varchar(32) default '',targetId int default 0,targetCallsign varchar(32) default '',channel int default 0,serviceType varchar(15) default 'Voice',callType varchar(15) default 'Group',timeStamp int default 0, onRepeater varchar(32) default '', senderName varchar(32) default '')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table traffic created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+
+	if (!isTableExisting(db,"voiceTraffic")){
+		sprintf(SQLQUERY,"CREATE TABLE voiceTraffic (senderId int default 0 PRIMARY KEY,senderCallsign varchar(32) default '',targetId int default 0,targetCallsign varchar(32) default '',channel int default 0,serviceType varchar(15) default 'Voice',callType varchar(15) default 'Group',timeStamp int default 0, onRepeater varchar(32) default '', senderName varchar(32) default '')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table voiceTraffic created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+
+
 	//check for new fields added later in development
 	if (!isFieldExisting(db,"repeaters","language")){
 		sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN language varchar(50) default 'english'");
@@ -256,16 +279,6 @@ int initDatabase(sqlite3 *db){
                 }
         }
 
-        if (!isFieldExisting(db,"traffic","senderName")){
-                sprintf(SQLQUERY,"ALTER TABLE traffic ADD COLUMN senderName varchar(32) default '' ");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field senderName in traffic created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
 
 	return 1;
 }
