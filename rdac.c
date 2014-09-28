@@ -55,6 +55,8 @@ void delRdacRepeater(struct sockaddr_in address){
 			rdacList[i].rdacUpdated = false;
 			rdacList[i].dmrOnline = false;
 			rdacList[i].id = 0;
+			rdacList[i].conference[1] = 0;
+			rdacList[i].conference[2] = 0;
 			rdacList[i].lastPTPPConnect = 0;
 			rdacList[i].lastDMRConnect = 0;
 			rdacList[i].lastRDACConnect = 0;

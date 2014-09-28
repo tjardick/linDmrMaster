@@ -55,7 +55,12 @@ void *scheduler(){
 		//Delete old traffic data
                 sprintf(SQLQUERY,"DELETE FROM traffic WHERE %lu-timeStamp > 86400",time(NULL));
                 if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
-                        syslog(LOG_NOTICE,"Failed to cleanup RRS database: %s",sqlite3_errmsg(dbase));
+                        syslog(LOG_NOTICE,"Failed to cleanup traffic database: %s",sqlite3_errmsg(dbase));
+                }
+		//Delete old voiceTraffic data
+                sprintf(SQLQUERY,"DELETE FROM voiceTraffic WHERE %lu-timeStamp > 86400",time(NULL));
+                if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+                        syslog(LOG_NOTICE,"Failed to cleanup voiceTraffic database: %s",sqlite3_errmsg(dbase));
                 }
 
 		closeDatabase(dbase);

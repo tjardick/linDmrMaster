@@ -45,6 +45,7 @@ struct repeater{
 	bool rdacOnline;
 	bool rdacUpdated;
 	bool sending[3];
+	int conference[3];
 	int id;
 	time_t lastPTPPConnect;
 	time_t lastDMRConnect;
@@ -117,12 +118,18 @@ struct gpsCoordinates{
 	unsigned char heading[4];
 };
 
+struct reflector{
+	int id;
+	unsigned char name[55];
+};
+
 typedef enum {VOICE, DATA, IDLE} state;
 
 extern struct repeater repeaterList[100];
 extern struct repeater rdacList[100];
 extern struct masterData sMaster;
 extern struct masterInfo master;
+extern struct reflector localReflectors[50];
 extern struct ts tsInfo;
 extern char databaseServer[50];
 extern char databaseUser[20];
@@ -152,3 +159,4 @@ extern char page[50];
 extern char aprsUrl[100];
 extern char aprsPort[7];
 extern int aprsSockFd;
+extern int numReflectors;

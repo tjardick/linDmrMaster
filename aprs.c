@@ -128,6 +128,10 @@ void sendAprs(struct gpsCoordinates gpsData, int radioId,int destId, struct repe
 	//overwrite symbol if destId != 500
 	switch(destId){
 
+        case 5050:	//fixed (home)
+        aprsCor[18] = 45;
+	sprintf(radioIdent.aprsSuffix,"");
+        break;
 	case 5055:	//Different network  -5 (node)
 	aprsCor[18] = 110;
 	sprintf(radioIdent.aprsSuffix,"-5");
@@ -148,10 +152,6 @@ void sendAprs(struct gpsCoordinates gpsData, int radioId,int destId, struct repe
 	aprsCor[18] = 62;
 	sprintf(radioIdent.aprsSuffix,"-9");
 	break;
-        case 5060:	//fixed -0 (home)
-        aprsCor[18] = 45;
-	sprintf(radioIdent.aprsSuffix,"-0");
-        break;
 	}
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s%s>APRS,%s,qAR,%s:!%s %s\n",repeater.callsign,repeater.aprsPass,radioIdent.callsign,radioIdent.aprsSuffix,repeater.callsign,repeater.callsign,aprsCor,radioIdent.aprsBeacon);
 

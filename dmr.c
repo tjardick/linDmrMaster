@@ -131,6 +131,34 @@ struct allow checkTalkGroup(int dstId, int slot, int callType){
 	return toSend;
 }
 
+void reflectorStatus(int sockfd, struct sockaddr_in address,int status){
+
+	char fileName[100];
+        FILE *file;
+        int slotType=0,frameType=0;
+	unsigned char buffer[VFRAMESIZE];
+
+	if(status ==2){
+	        sprintf(fileName,"connected.voice");
+	}
+	else{
+	        sprintf(fileName,"disconnected.voice");
+	}
+	sleep(1);
+        if (file = fopen(fileName,"rb")){
+                while (fread(buffer,VFRAMESIZE,1,file)){
+                        sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+                        slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+                        frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+                        if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+                }
+        fclose(file);
+        }
+        else{
+                syslog(LOG_NOTICE,"File %s not found",fileName);
+        }
+}
+
 void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in address, int srcId, int repPos){
 	struct frame{
 		unsigned char buf[VFRAMESIZE];
@@ -259,7 +287,7 @@ void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int c
 }
 
 void *dmrListener(void *f){
-	int sockfd,n,i,rc,ii;
+	int sockfd,n,i,rc,ii,l;
 	struct sockaddr_in servaddr,cliaddr;
 	socklen_t len;
 	unsigned char buffer[VFRAMESIZE];
@@ -276,7 +304,7 @@ void *dmrListener(void *f){
 	unsigned char slot = 0;
 	fd_set fdMaster;
 	struct timeval timeout;
-	time_t timeNow,pingTime;
+	time_t timeNow,pingTime,reflectorTimeout;
 	struct allow toSend = {0};
 	bool block[3];
 	bool releaseBlock[3];
@@ -291,6 +319,7 @@ void *dmrListener(void *f){
 	unsigned char *decoded34[3];
 	unsigned char *decoded12[3];
 	unsigned char decodedString[3][300];
+	int reflectorNewState = 0;
 
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
@@ -375,13 +404,36 @@ void *dmrListener(void *f){
 								echoTest(buffer,sockfd,repeaterList[repPos].address,srcId[slot],repPos);
 								repeaterList[repPos].sending[slot] = false;
 								break;
-							} 
+							}
+							if(dstId[2] == 4000 && repeaterList[repPos].conference[2] != 0){
+								syslog(LOG_NOTICE,"[%s]Removing repeater from conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
+								repeaterList[repPos].conference[2] = 0;
+								reflectorNewState = 1;
+							}
+							if(dstId[2] > 4000 && dstId[2] < 5000){
+								for(l=0;l<numReflectors;l++){
+									if(localReflectors[l].id = dstId[2]){
+										repeaterList[repPos].conference[2] = dstId[2];
+										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name);
+										time(&reflectorTimeout);
+										reflectorNewState = 2;
+										break;
+									}
+								}
+							}
 							toSend = checkTalkGroup(dstId[slot],slot,callType[slot]);
 							if (toSend.repeater == false){
 								block[slot] = true;
-								syslog(LOG_NOTICE,"[%s]Talk group %i not configured on slot %i so not relaying",repeaterList[repPos].callsign,dstId[slot],slot);
+								if(repeaterList[repPos].conference[2] != 0 && slot == 2 && dstId[2] == 9){
+									syslog(LOG_NOTICE,"[%s]Voice call started, sending to conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
+									time(&reflectorTimeout);
+								}
+								else{
+									syslog(LOG_NOTICE,"[%s]Talk group %i not configured on slot %i so not relaying",repeaterList[repPos].callsign,dstId[slot],slot);
+								}
 								break;
 							}
+
 							if(toSend.isRange && dstId[slot] != master.ownCCInt){
 								memcpy(sMasterFrame+90,(char*)&master.ownCCInt,sizeof(int));
 							}
@@ -451,7 +503,7 @@ void *dmrListener(void *f){
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]1/2 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
-								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5055 && dstId[slot] < 5061)){
+								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5049 && dstId[slot] < 5061)){
 									if(memcmp(decodedString[slot] + 1,rrsHyt,4) == 0) decodeHyteraRrs(repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 1,rrsOffHyt,4) == 0) decodeHyteraOffRrs(repeaterList[repPos],decodedString[slot]);
 									logTraffic(srcId[slot],dstId[slot],slot,"RRS",callType[slot],repeaterList[repPos].callsign);
@@ -473,7 +525,7 @@ void *dmrListener(void *f){
 								dataBlocks[slot] = 0;
 								repeaterList[repPos].sending[slot] = false;
 								syslog(LOG_NOTICE,"[%s]3/4 rate data continuation all data blocks received on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
-								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5055 && dstId[slot] < 5061)){
+								if(dstId[slot] == rrsGpsId || (dstId[slot] > 5049 && dstId[slot] < 5061)){
 									if(memcmp(decodedString[slot] + 4,gpsStringHyt,4) == 0) decodeHyteraGpsTriggered(srcId[slot],dstId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsStringButtonHyt,4) == 0) decodeHyteraGpsButton(srcId[slot],dstId[slot],repeaterList[repPos],decodedString[slot]);
 									if(memcmp(decodedString[slot] + 4,gpsCompressedStringHyt,4) == 0) decodeHyteraGpsCompressed(srcId[slot],repeaterList[repPos],decodedString[slot]);
@@ -497,12 +549,23 @@ void *dmrListener(void *f){
 								syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
 								releaseBlock[slot] = true;
 							}
+							if (reflectorNewState !=0 && slot ==2){
+								reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState);
+								reflectorNewState = 0;
+							}
 						}
 						break;
 					}
+					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9){
+						for (i=0;i<highestRepeater;i++){
+							if (repeaterList[i].conference[2] == repeaterList[repPos].conference[2] && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr){
+								sendto(repeaterList[i].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+							}
+						}
+					}
 					if (!block[slot]){
 						for (i=0;i<highestRepeater;i++){
-							if (repeaterList[i].address.sin_addr.s_addr !=0 && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr){
+							if (repeaterList[i].address.sin_addr.s_addr !=0 && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr && repeaterList[repPos].conference[slot] == 0){
 								sendto(repeaterList[i].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 							}
 						}
@@ -562,6 +625,11 @@ void *dmrListener(void *f){
 				if (dmrState[2] == VOICE){
 					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					logTraffic(srcId[2],dstId[2],slot,"Voice",callType[2],repeaterList[repPos].callsign);
+                                        if (reflectorNewState !=0 && slot ==2){
+                                        	reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState);
+                                                reflectorNewState = 0;
+                                        }
+
 				}
 				if (receivingData[2]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
@@ -584,6 +652,10 @@ void *dmrListener(void *f){
 				delRdacRepeater(cliaddrOrg);
 				close(sockfd);
 				pthread_exit(NULL);
+			}
+			if (difftime(timeNow,reflectorTimeout) > 1800 && repeaterList[repPos].conference[2] !=0){
+				syslog(LOG_NOTICE,"[%s]Remove repeater from conference %i after conference timeout",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
+				repeaterList[repPos].conference[2] = 0;
 			}
 		}
 	}

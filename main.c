@@ -35,10 +35,12 @@ struct masterInfo master;
 static const struct masterInfo emptyMaster = {0};
 struct ts tsInfo = {0};
 struct sockaddr_in discardList[100] = {0};
+struct reflector  localReflectors[50] = {0};
 
 int rdacSock=0;
 int highestRepeater = 0;
 int restart = 0;
+int numReflectors = 0;
 
 sqlite3 *db;
 sqlite3 *openDatabase();
@@ -113,6 +115,8 @@ int initRepeater(struct repeater repeaterInfo){
 	repeaterInfo.address.sin_port=htons(dmrPort);
 	repeaterList[i].address = repeaterInfo.address;
 	repeaterList[i].id = repeaterInfo.id;
+	repeaterList[i].conference[1] = 0;
+	repeaterList[i].conference[2] = 0;
 	sprintf(repeaterList[i].callsign,"%s",repeaterInfo.callsign);
 	sprintf(repeaterList[i].txFreq,"%s",repeaterInfo.txFreq);
 	sprintf(repeaterList[i].shift,"%s",repeaterInfo.shift);
@@ -151,6 +155,8 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].rdacUpdated = false;
                         repeaterList[i].dmrOnline = false;
                         repeaterList[i].id = 0;
+			repeaterList[i].conference[1] = 0;
+			repeaterList[i].conference[2] = 0;
                         repeaterList[i].lastPTPPConnect = 0;
                         repeaterList[i].lastDMRConnect = 0;
                         repeaterList[i].lastRDACConnect = 0;
@@ -258,7 +264,8 @@ void serviceListener(port){
 					response[4]++;
 					response[13]=0x01;
 					response[n] = 0x01;
-					cliaddr.sin_port=htons(port);
+					//cliaddr.sin_port=htons(port);
+					cliaddr.sin_port=rdacList[rdacPos].address.sin_port;
 					sendto(sockfd,response,n+1,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
 					syslog(LOG_NOTICE,"Assigned DMR device 1 to repeater [%s - %s]",str,repeaterList[repPos].callsign);
 					//Assign port number
@@ -287,16 +294,22 @@ void serviceListener(port){
 					int rdacPos;
 					//Initialize this repeater for RDAC
 					if(isDiscarded(cliaddr)) continue;
-					rdacPos = setRdacRepeater(cliaddr);
+					//rdacPos = setRdacRepeater(cliaddr);
+					rdacPos = findRdacRepeater(cliaddr);
+					cliaddr.sin_port=rdacList[rdacPos].address.sin_port;
 					if (difftime(timeNow,rdacList[rdacPos].lastRDACConnect) < 10) continue;  //Ignore connect request
 					syslog(LOG_NOTICE,"RDAC request from repeater [%s]",str);
-					if (rdacPos == 99) continue;   //If 99 returned, more repeaters then allowed
+					//if (rdacPos == 99) continue;   //If 99 returned, more repeaters then allowed
+					if (rdacPos == 99){
+						rdacPos = setRdacRepeater(cliaddr);
+						cliaddr.sin_port=htons(port);
+					}
 					memcpy(response,buffer,n);
 					//Assign device ID
 					response[4]++;
 					response[13]=0x01;
 					response[n] = 0x01;
-					cliaddr.sin_port=htons(port);
+					//cliaddr.sin_port=htons(port);
 					sendto(sockfd,response,n+1,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
 					syslog(LOG_NOTICE,"Assigned RDAC device 1 to repeater [%s]",str);
 					//Assign port number
@@ -415,6 +428,30 @@ int getMasterInfo(){
 	sqlite3_finalize(stmt);
 	closeDatabase(db);
 	return 1;
+}
+
+
+void getLocalReflectors(){
+        unsigned char SQLQUERY[200] = {0};
+        sqlite3_stmt *stmt;
+
+        db = openDatabase();
+        sprintf(SQLQUERY,"SELECT id,name FROM localReflectors");
+        if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
+                while (sqlite3_step(stmt) == SQLITE_ROW){
+                        localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
+                        sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
+			syslog(LOG_NOTICE,"Added reflector %i %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name);
+			numReflectors++;
+                }
+        }
+        else{
+                syslog(LOG_NOTICE,"failed to read localReflectors, query bad");
+                closeDatabase(db);
+                return;
+        }
+        sqlite3_finalize(stmt);
+	closeDatabase(db);
 }
 
 int loadTalkGroups(){
@@ -667,6 +704,7 @@ int main(int argc, char**argv)
 		if(!getMasterInfo()) return 0;
 		//Load the allowed talkgroups
 		if(!loadTalkGroups()) return 0;
+		getLocalReflectors();
 		//Start sMaster Thread
 		pthread_create(&thread, NULL, sMasterThread,NULL);
 		//Start listening on the service port
