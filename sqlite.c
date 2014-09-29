@@ -177,13 +177,35 @@ int initDatabase(sqlite3 *db){
 		}
 	}
 
+	if (!isTableExisting(db,"localReflectors")){
+		sprintf(SQLQUERY,"CREATE TABLE localReflectors(id int primary key,name varchar(50))");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table localReflectors created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+
 
 	//check for new fields added later in development
 
-        if (!isFieldExisting(db,"rrs","unixTime")){
-                sprintf(SQLQUERY,"ALTER TABLE rrs ADD COLUMN unixTime INT default 0");
+        if (!isFieldExisting(db,"repeaters","currentReflector")){
+                sprintf(SQLQUERY,"alter table repeaters add currentReflector integer default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field unixTime in rrs created");
+                        syslog(LOG_NOTICE,"field currentreflector in repeaters created");
+                }
+                else{
+                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+                        return 0;
+                }
+        }
+
+        if (!isFieldExisting(db,"repeaters","autoReflector")){
+                sprintf(SQLQUERY,"alter table repeaters add autoReflector integer default 0");
+                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+                        syslog(LOG_NOTICE,"field autoReflector in repeaters created");
                 }
                 else{
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
