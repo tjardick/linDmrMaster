@@ -131,7 +131,27 @@ struct allow checkTalkGroup(int dstId, int slot, int callType){
 	return toSend;
 }
 
-void reflectorStatus(int sockfd, struct sockaddr_in address,int status){
+void updateRepeaterTable(int status, int reflector, int repPos){
+
+	char SQLQUERY[400];
+	sqlite3 *dbase;
+	sqlite3_stmt *stmt;
+
+	if(status ==2){
+		sprintf(SQLQUERY,"UPDATE repeaters set currentReflector = %i where callsign = '%s'",reflector,repeaterList[repPos].callsign);
+	}
+	else{
+		sprintf(SQLQUERY,"UPDATE repeaters set currentReflector = 0 where callsign = '%s'",repeaterList[repPos].callsign);
+	}
+        dbase = openDatabase();
+	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+                syslog(LOG_NOTICE,"Failed to update repeater table: %s",sqlite3_errmsg(dbase));
+                syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+        }
+        closeDatabase(dbase);
+}
+
+void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int reflector, int repPos){
 
 	char fileName[100];
         FILE *file;
@@ -144,6 +164,7 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status){
 	else{
 	        sprintf(fileName,"disconnected.voice");
 	}
+	updateRepeaterTable(status,reflector,repPos);
 	sleep(1);
         if (file = fopen(fileName,"rb")){
                 while (fread(buffer,VFRAMESIZE,1,file)){
@@ -304,7 +325,7 @@ void *dmrListener(void *f){
 	unsigned char slot = 0;
 	fd_set fdMaster;
 	struct timeval timeout;
-	time_t timeNow,pingTime,reflectorTimeout;
+	time_t timeNow,pingTime,reflectorTimeout,autoReconnectTimer;
 	struct allow toSend = {0};
 	bool block[3];
 	bool releaseBlock[3];
@@ -354,7 +375,12 @@ void *dmrListener(void *f){
 	FD_ZERO(&fdMaster);
 	time(&pingTime);
 	len = sizeof(cliaddr);
-	
+
+	autoReconnectTimer = 0;
+	if(repeaterList[repPos].autoReflector != 0){
+		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
+		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
+	}
 	for (;;){
 		FD_SET(sockfd, &fdMaster);
 		timeout.tv_sec = 1;
@@ -409,6 +435,7 @@ void *dmrListener(void *f){
 								syslog(LOG_NOTICE,"[%s]Removing repeater from conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 								repeaterList[repPos].conference[2] = 0;
 								reflectorNewState = 1;
+								if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 							}
 							if(dstId[2] > 4000 && dstId[2] < 5000){
 								for(l=0;l<numReflectors;l++){
@@ -417,6 +444,7 @@ void *dmrListener(void *f){
 										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name);
 										time(&reflectorTimeout);
 										reflectorNewState = 2;
+										if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 										break;
 									}
 								}
@@ -427,9 +455,11 @@ void *dmrListener(void *f){
 								if(repeaterList[repPos].conference[2] != 0 && slot == 2 && dstId[2] == 9){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 									time(&reflectorTimeout);
+									if (autoReconnectTimer !=0) time(&autoReconnectTimer);
 								}
 								else{
 									syslog(LOG_NOTICE,"[%s]Talk group %i not configured on slot %i so not relaying",repeaterList[repPos].callsign,dstId[slot],slot);
+									if(autoReconnectTimer !=0 && dstId[2] == 9) time(&autoReconnectTimer);
 								}
 								break;
 							}
@@ -550,7 +580,7 @@ void *dmrListener(void *f){
 								releaseBlock[slot] = true;
 							}
 							if (reflectorNewState !=0 && slot ==2){
-								reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState);
+								reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState,repeaterList[repPos].conference[2],repPos);
 								reflectorNewState = 0;
 							}
 						}
@@ -626,7 +656,7 @@ void *dmrListener(void *f){
 					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					logTraffic(srcId[2],dstId[2],slot,"Voice",callType[2],repeaterList[repPos].callsign);
                                         if (reflectorNewState !=0 && slot ==2){
-                                        	reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState);
+                                        	reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState,repeaterList[repPos].conference[2],repPos);
                                                 reflectorNewState = 0;
                                         }
 
@@ -653,9 +683,17 @@ void *dmrListener(void *f){
 				close(sockfd);
 				pthread_exit(NULL);
 			}
-			if (difftime(timeNow,reflectorTimeout) > 1800 && repeaterList[repPos].conference[2] !=0){
+			if (difftime(timeNow,reflectorTimeout) > 1800 && repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].autoReflector == 0){
 				syslog(LOG_NOTICE,"[%s]Remove repeater from conference %i after conference timeout",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 				repeaterList[repPos].conference[2] = 0;
+				reflectorStatus(sockfd,repeaterList[repPos].address,1,repeaterList[repPos].conference[2],repPos);
+			}
+			if (difftime(timeNow,autoReconnectTimer) > 600 && autoReconnectTimer != 0){
+				syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i due to auto reconnect timer",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
+				repeaterList[repPos].conference[2] = repeaterList[repPos].autoReflector;
+				reflectorStatus(sockfd,repeaterList[repPos].address,2,repeaterList[repPos].conference[2],repPos);
+				autoReconnectTimer = 0;
+
 			}
 		}
 	}

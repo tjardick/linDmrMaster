@@ -61,6 +61,7 @@ struct repeater{
 	unsigned char aprsPass[6];
 	unsigned char aprsBeacon[100];
 	unsigned char aprsPHG[7];
+	int autoReflector;
 };
 
 

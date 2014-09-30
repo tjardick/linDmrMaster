@@ -27,7 +27,7 @@ int baseRdacPort = 50200;
 int maxRepeaters = 20;
 int echoId = 9990;
 int rrsGpsId = 500;
-char version[5] = "2.0";
+char version[5] = "2.1";
 
 struct repeater repeaterList[100] = {0};
 struct repeater emptyRepeater = {0};
@@ -116,7 +116,8 @@ int initRepeater(struct repeater repeaterInfo){
 	repeaterList[i].address = repeaterInfo.address;
 	repeaterList[i].id = repeaterInfo.id;
 	repeaterList[i].conference[1] = 0;
-	repeaterList[i].conference[2] = 0;
+	repeaterList[i].conference[2] = repeaterInfo.autoReflector;
+	repeaterList[i].autoReflector = repeaterInfo.autoReflector;
 	sprintf(repeaterList[i].callsign,"%s",repeaterInfo.callsign);
 	sprintf(repeaterList[i].txFreq,"%s",repeaterInfo.txFreq);
 	sprintf(repeaterList[i].shift,"%s",repeaterInfo.shift);
@@ -157,6 +158,7 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].id = 0;
 			repeaterList[i].conference[1] = 0;
 			repeaterList[i].conference[2] = 0;
+			repeaterList[i].autoReflector = 0;
                         repeaterList[i].lastPTPPConnect = 0;
                         repeaterList[i].lastDMRConnect = 0;
                         repeaterList[i].lastRDACConnect = 0;
