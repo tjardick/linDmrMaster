@@ -576,7 +576,7 @@ void *dmrListener(void *f){
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i type %i",repeaterList[repPos].callsign,slot,callType[slot]);
 							logTraffic(srcId[slot],dstId[slot],slot,"Voice",callType[slot],repeaterList[repPos].callsign);
 							if (block[slot] == true){
-								syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
+								if (repeaterList[repPos].conference[2] ==0 && slot == 2) syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
 								releaseBlock[slot] = true;
 							}
 							if (reflectorNewState !=0 && slot ==2){
@@ -677,6 +677,7 @@ void *dmrListener(void *f){
 			if (difftime(timeNow,pingTime) > 60 && !repeaterList[repPos].sending[slot]){
 				syslog(LOG_NOTICE,"PING timeout on DMR port %i repeater %s, exiting thread",baseDmrPort + repPos,repeaterList[repPos].callsign);
 				syslog(LOG_NOTICE,"Removing repeater from list position %i",repPos);
+				updateRepeaterTable(1,repeaterList[repPos].autoReflector,repPos);
 				delRepeater(cliaddrOrg);
 				if (repPos + 1 == highestRepeater) highestRepeater--;
 				delRdacRepeater(cliaddrOrg);

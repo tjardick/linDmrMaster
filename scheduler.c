@@ -29,6 +29,7 @@ void *scheduler(){
 	char SQLQUERY[200];
         sqlite3 *dbase;
         sqlite3_stmt *stmt;
+	bool sending = false;
 
 	syslog(LOG_NOTICE,"Scheduler thread started");
 	for(;;){
@@ -64,5 +65,34 @@ void *scheduler(){
                 }
 
 		closeDatabase(dbase);
+
+		//cleanup dmr not idle
+		if (dmrState[1] != IDLE){
+			for(i=0;i<highestRepeater;i++){
+				if (repeaterList[i].sending[1]){
+					sending = true;
+					break;
+				}
+			}
+			if (!sending){
+				dmrState[1] = IDLE;
+				syslog(LOG_NOTICE,"DMR state inconsistent on slot 1, settign IDLE");
+			}
+		}
+		sending = false;
+
+		if (dmrState[2] != IDLE){
+			for(i=0;i<highestRepeater;i++){
+				if (repeaterList[i].sending[2]){
+					sending = true;
+					break;
+				}
+			}
+			if (!sending){
+				dmrState[2] = IDLE;
+				syslog(LOG_NOTICE,"DMR state inconsistent on slot 2, settign IDLE");
+			}
+		}
+
 	}
 }
