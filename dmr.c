@@ -166,6 +166,7 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int refle
 	}
 	updateRepeaterTable(status,reflector,repPos);
 	sleep(1);
+	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
         if (file = fopen(fileName,"rb")){
                 while (fread(buffer,VFRAMESIZE,1,file)){
                         sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
@@ -377,10 +378,10 @@ void *dmrListener(void *f){
 	len = sizeof(cliaddr);
 
 	autoReconnectTimer = 0;
-	if(repeaterList[repPos].autoReflector != 0){
-		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
-		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
-	}
+        if(repeaterList[repPos].autoReflector != 0){
+                updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
+                syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
+        }
 	for (;;){
 		FD_SET(sockfd, &fdMaster);
 		timeout.tv_sec = 1;
@@ -409,7 +410,7 @@ void *dmrListener(void *f){
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							callType[slot] = buffer[TYP_OFFSET1];
 							toSend.sMaster = false;
-							if (dstId[slot] == rrsGpsId || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
+							if (dstId[slot] == rrsGpsId || (dstId[slot] > 5049 && dstId[slot] < 5061) || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
 							break;
 						}
 
@@ -425,7 +426,7 @@ void *dmrListener(void *f){
 								sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
 								sendto(sMaster.sockfd,webUserInfo,strlen(webUserInfo),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 							}
-							if (dstId[slot] == echoId){
+							if (dstId[slot] == echoId && slot == echoSlot){
 								syslog(LOG_NOTICE,"[%s]Echo test started on slot %i src %i",repeaterList[repPos].callsign,slot,srcId[slot]);
 								echoTest(buffer,sockfd,repeaterList[repPos].address,srcId[slot],repPos);
 								repeaterList[repPos].sending[slot] = false;
@@ -496,7 +497,7 @@ void *dmrListener(void *f){
 							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							toSend.sMaster = false;
-							if (dstId[slot] == rrsGpsId || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
+							if (dstId[slot] == rrsGpsId || (dstId[slot] > 5049 && dstId[slot] < 5061) || srcId[slot] == repeaterList[repPos].id) block[slot] = true;
 							break;
 						}
 						
@@ -549,7 +550,7 @@ void *dmrListener(void *f){
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
-							if(headerDecode[slot].appendBlocks == dataBlocks[slot]){
+							if(headerDecode[slot].appendBlocks +1 == dataBlocks[slot]){  //Hytera sends last datablock twice
 								releaseBlock[slot] = true;
 								receivingData[slot] = false;
 								dataBlocks[slot] = 0;
@@ -576,7 +577,6 @@ void *dmrListener(void *f){
 							syslog(LOG_NOTICE,"[%s]Voice call ended on slot %i type %i",repeaterList[repPos].callsign,slot,callType[slot]);
 							logTraffic(srcId[slot],dstId[slot],slot,"Voice",callType[slot],repeaterList[repPos].callsign);
 							if (block[slot] == true){
-								if (repeaterList[repPos].conference[2] ==0 && slot == 2) syslog(LOG_NOTICE,"[%s] But was not relayed because of not configured talk group",repeaterList[repPos].callsign);
 								releaseBlock[slot] = true;
 							}
 							if (reflectorNewState !=0 && slot ==2){

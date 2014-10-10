@@ -26,6 +26,7 @@ int rdacPort = 50002;
 int baseRdacPort = 50200;
 int maxRepeaters = 20;
 int echoId = 9990;
+int echoSlot = 1;
 int rrsGpsId = 500;
 char version[5] = "2.1";
 
@@ -392,7 +393,7 @@ int getMasterInfo(){
     syslog(LOG_NOTICE,"sMaster info: ownName %s, ownCountryCode %s, ownRegion %s, sMasterIp %s, sMasterPort %s",
 	master.ownName,master.ownCountryCode,master.ownRegion,master.sMasterIp,master.sMasterPort);
 	
-	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort FROM master");
+	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot FROM master");
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			servicePort = sqlite3_column_int(stmt,0);
@@ -404,6 +405,7 @@ int getMasterInfo(){
 			rrsGpsId = sqlite3_column_int(stmt,6);
 			sprintf(aprsUrl,"%s",sqlite3_column_text(stmt,7));
 			sprintf(aprsPort,"%s",sqlite3_column_text(stmt,8));
+			echoSlot = sqlite3_column_int(stmt,9);
 
 		}
 		else{
@@ -418,8 +420,8 @@ int getMasterInfo(){
 		closeDatabase(db);
 		return 0;
 	}
-	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i rrsGpsId %i",
-	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,rrsGpsId);
+	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i echoSlot %i rrsGpsId %i",
+	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,echoSlot,rrsGpsId);
 	syslog(LOG_NOTICE,"Assigning APRS server %s port %s",aprsUrl,aprsPort);
 	if (maxRepeaters > 98){
 		syslog(LOG_NOTICE,"maxRepeaters exceeded 98, quiting application");
