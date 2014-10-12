@@ -313,6 +313,7 @@ void *dmrListener(void *f){
 	struct sockaddr_in servaddr,cliaddr;
 	socklen_t len;
 	unsigned char buffer[VFRAMESIZE];
+	unsigned char holdBuffer[3][VFRAMESIZE];
 	unsigned char response[VFRAMESIZE] ={0};
 	struct sockInfo* param = (struct sockInfo*) f;
 	int repPos = param->port - baseDmrPort;
@@ -342,6 +343,7 @@ void *dmrListener(void *f){
 	unsigned char *decoded12[3];
 	unsigned char decodedString[3][300];
 	int reflectorNewState = 0;
+	bool txStart;
 
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
@@ -360,6 +362,7 @@ void *dmrListener(void *f){
 	block[2] = false;
 	releaseBlock[1] = false;
 	releaseBlock[2] = false;
+	txStart = false;
 	//create frame to append after packet for sMaster
 	memset(sMasterFrame,0,103);
 	memcpy(myId,(char*)&repeaterList[repPos].id,sizeof(int));
@@ -404,6 +407,14 @@ void *dmrListener(void *f){
 					switch (packetType[slot]){
 
 						case 0x02:
+
+						if (slotType[slot] == 0xdddd){
+							memcpy(holdBuffer[slot],buffer,n);
+							block[slot] = true;
+							releaseBlock[slot] = true;
+							txStart = true;
+							break;
+						}
 
 						if (slotType[slot] == 0xeeee && frameType[slot] == 0x6666){//Sometimes start of data and no CSBK afterwards
 							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
@@ -594,15 +605,32 @@ void *dmrListener(void *f){
 						}
 					}
 					if (!block[slot]){
+						if (toSend.sMaster && sMaster.online){
+							if (txStart){
+								memcpy(sMasterFrame,holdBuffer[1],n);
+								memcpy(sMasterFrame + n,myId,11);
+								sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+								memcpy(sMasterFrame,holdBuffer[2],n);
+								memcpy(sMasterFrame + n,myId,11);
+								sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+							}
+							memcpy(sMasterFrame,buffer,n);
+							memcpy(sMasterFrame + n,myId,11);
+							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+						}
+						if(txStart){
+							txStart = false;
+							for (i=0;i<highestRepeater;i++){
+								if (repeaterList[i].address.sin_addr.s_addr !=0 && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr && repeaterList[repPos].conference[slot] == 0){
+									sendto(repeaterList[i].sockfd,holdBuffer[1],n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+									sendto(repeaterList[i].sockfd,holdBuffer[2],n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+								}
+							}
+						}
 						for (i=0;i<highestRepeater;i++){
 							if (repeaterList[i].address.sin_addr.s_addr !=0 && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr && repeaterList[repPos].conference[slot] == 0){
 								sendto(repeaterList[i].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 							}
-						}
-						if (toSend.sMaster && sMaster.online){
-							memcpy(sMasterFrame,buffer,n);
-							memcpy(sMasterFrame + n,myId,11);
-							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 						}
 					}
 					else{

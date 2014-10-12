@@ -190,8 +190,7 @@ void serviceListener(port){
 	unsigned char buffer[500];
 	unsigned char response[500] ={0};
 	unsigned char command[] = {0x50,0x32,0x50,0x50};
-	unsigned char ping[] = {0x5a,0x5a,0x5a,0x5a};
-	unsigned char ping2[] = {0xe8,0x40,0xb4,0x10};
+	unsigned char ping[] = {0x0a,0x00,0x00,0x00,0x14};
 	char str[INET_ADDRSTRLEN];
 	int redirectPort;
 	int repPos;
@@ -337,10 +336,11 @@ void serviceListener(port){
 					syslog(LOG_NOTICE,"Re-directed repeater [%s] to RDAC port %i",str,redirectPort);
 					time(&rdacList[rdacPos].lastRDACConnect);
 					break;}
+
 				}
 			}
 		
-			if ((memcmp(buffer,ping,sizeof(ping)) == 0 || memcmp(buffer,ping2,sizeof(ping2)) == 0) && repeaterList[findRepeater(cliaddr)].dmrOnline){//Is this a heartbeat from a repeater on the service port ? And do we know the repeater ?
+			if ((memcmp(buffer+4,ping,sizeof(ping)) == 0) && repeaterList[findRepeater(cliaddr)].dmrOnline){//Is this a heartbeat from a repeater on the service port ? And do we know the repeater ?
 				memcpy(response,buffer,n);
 				response[12]++;
 				sendto(sockfd,response,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));

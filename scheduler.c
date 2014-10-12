@@ -74,6 +74,7 @@ void *scheduler(){
 					break;
 				}
 			}
+			if (sMaster.sending[1]) sending = true;
 			if (!sending){
 				dmrState[1] = IDLE;
 				syslog(LOG_NOTICE,"DMR state inconsistent on slot 1, settign IDLE");
@@ -88,6 +89,7 @@ void *scheduler(){
 					break;
 				}
 			}
+			if (sMaster.sending[2]) sending = true;
 			if (!sending){
 				dmrState[2] = IDLE;
 				syslog(LOG_NOTICE,"DMR state inconsistent on slot 2, settign IDLE");
