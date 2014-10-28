@@ -46,7 +46,10 @@ struct repeater{
 	bool rdacUpdated;
 	bool sending[3];
 	int conference[3];
+	int pearRepeater[3];
+	int pearPos[3];
 	int id;
+	time_t pearTimeout;
 	time_t lastPTPPConnect;
 	time_t lastDMRConnect;
 	time_t lastRDACConnect;

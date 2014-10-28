@@ -119,6 +119,10 @@ int initRepeater(struct repeater repeaterInfo){
 	repeaterList[i].conference[1] = 0;
 	repeaterList[i].conference[2] = repeaterInfo.autoReflector;
 	repeaterList[i].autoReflector = repeaterInfo.autoReflector;
+	repeaterList[i].pearRepeater[1] = 0;
+	repeaterList[i].pearRepeater[2] = 0;
+	repeaterList[i].pearPos[1] = 0;
+	repeaterList[i].pearPos[2] = 0;
 	sprintf(repeaterList[i].callsign,"%s",repeaterInfo.callsign);
 	sprintf(repeaterList[i].txFreq,"%s",repeaterInfo.txFreq);
 	sprintf(repeaterList[i].shift,"%s",repeaterInfo.shift);

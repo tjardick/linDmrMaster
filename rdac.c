@@ -58,6 +58,10 @@ void delRdacRepeater(struct sockaddr_in address){
 			rdacList[i].conference[1] = 0;
 			rdacList[i].conference[2] = 0;
 			rdacList[i].autoReflector = 0;
+			rdacList[i].pearRepeater[1] = 0;
+			rdacList[i].pearRepeater[2] = 0;
+			rdacList[i].pearPos[1] = 0;
+			rdacList[i].pearPos[2] = 0;
 			rdacList[i].lastPTPPConnect = 0;
 			rdacList[i].lastDMRConnect = 0;
 			rdacList[i].lastRDACConnect = 0;
@@ -136,9 +140,17 @@ int setRdacRepeater(struct sockaddr_in address){
 
 int findRdacRepeater(struct sockaddr_in address){
 	int i;
+	char str[INET_ADDRSTRLEN];
+	char str1[INET_ADDRSTRLEN];
 
 	for(i=0;i<maxRepeaters;i++){
-		if (rdacList[i].address.sin_addr.s_addr == address.sin_addr.s_addr) return i;
+		inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
+		inet_ntop(AF_INET, &(rdacList[i].address.sin_addr), str1, INET_ADDRSTRLEN);
+		if (rdacList[i].address.sin_addr.s_addr == address.sin_addr.s_addr){
+			syslog(LOG_NOTICE,"DEBUG findRdacRepeater search %s, found %s, repId %i, repCallsign %s, i %i, maxRep %i",str,str1,rdacList[i].id,rdacList[i].callsign,i,maxRepeaters);
+			return i;
+		}
+		syslog(LOG_NOTICE,"DEBUG pos %i in rdacList, repeaterId %i, repeaterCallsign %s, repeaterAddr %s",i,rdacList[i].id,rdacList[i].callsign,str1);
 	}
 	
 	return 99;

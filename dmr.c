@@ -443,6 +443,11 @@ void *dmrListener(void *f){
 								repeaterList[repPos].sending[slot] = false;
 								break;
 							}
+							if(dstId[2] == 4000 && repeaterList[repPos].pearRepeater[2] != 0){
+								syslog(LOG_NOTICE,"[%s]Disconnecting from repeater %i",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
+								repeaterList[repPos].pearRepeater[2] = 0;
+								repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] = 0;
+							}
 							if(dstId[2] == 4000 && repeaterList[repPos].conference[2] != 0){
 								syslog(LOG_NOTICE,"[%s]Removing repeater from conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 								repeaterList[repPos].conference[2] = 0;
@@ -461,12 +466,46 @@ void *dmrListener(void *f){
 									}
 								}
 							}
+							if (slot == 2){
+								for (l=0;l<highestRepeater;l++){
+									if(dstId[2] == repeaterList[l].id){
+										if(dstId[2] == repeaterList[l].id){
+											syslog(LOG_NOTICE,"[%s]repeater cannot connect to itself",repeaterList[repPos]);
+											break;
+										}
+										if(repeaterList[l].pearRepeater[2] == 0 && repeaterList[l].conference[2] == 0){
+											repeaterList[repPos].pearRepeater[2] = repeaterList[l].id;
+											repeaterList[l].pearRepeater[2] = repeaterList[repPos].id;
+											repeaterList[repPos].pearPos[2] = l;
+											repeaterList[l].pearPos[2] = repPos;
+											if (repeaterList[repPos].conference[2] != 0){
+												repeaterList[repPos].conference[2] = 0;
+												reflectorNewState = 1;
+											}
+											if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
+											syslog(LOG_NOTICE,"[%s]connecting to repeater %s",repeaterList[repPos].callsign,repeaterList[l].callsign);
+											time(&repeaterList[repPos].pearTimeout);
+											time(&repeaterList[l].pearTimeout);
+										}
+										else{
+											syslog(LOG_NOTICE,"[%s]connect to repeater %s failed,busy",repeaterList[repPos].callsign,repeaterList[l].callsign);
+										}
+										break;
+									}
+								}
+							}
 							toSend = checkTalkGroup(dstId[slot],slot,callType[slot]);
 							if (toSend.repeater == false){
 								block[slot] = true;
 								if(repeaterList[repPos].conference[2] != 0 && slot == 2 && dstId[2] == 9){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 									time(&reflectorTimeout);
+									if (autoReconnectTimer !=0) time(&autoReconnectTimer);
+								}
+								else if(repeaterList[repPos].pearRepeater[2] != 0 && slot == 2 && dstId[2] == 9){
+									syslog(LOG_NOTICE,"[%s]Voice call started, sending to repeater %i",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
+									time(&repeaterList[repPos].pearTimeout);
+									time(&repeaterList[repeaterList[repPos].pearPos[2]].pearTimeout);
 									if (autoReconnectTimer !=0) time(&autoReconnectTimer);
 								}
 								else{
@@ -597,6 +636,9 @@ void *dmrListener(void *f){
 						}
 						break;
 					}
+					if (repeaterList[repPos].pearRepeater[2] != 0){
+						sendto(repeaterList[repeaterList[repPos].pearPos[2]].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[repeaterList[repPos].pearPos[2]].address,sizeof(repeaterList[repeaterList[repPos].pearPos[2]].address));
+					}
 					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9){
 						for (i=0;i<highestRepeater;i++){
 							if (repeaterList[i].conference[2] == repeaterList[repPos].conference[2] && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr){
@@ -711,6 +753,11 @@ void *dmrListener(void *f){
 				delRdacRepeater(cliaddrOrg);
 				close(sockfd);
 				pthread_exit(NULL);
+			}
+			if (difftime(timeNow,repeaterList[repPos].pearTimeout) > 1800 && repeaterList[repPos].pearRepeater[2] !=0){
+				syslog(LOG_NOTICE,"[%s]Disconnecting from repeater %i after timeout",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
+				repeaterList[repPos].pearRepeater[2] = 0;
+				repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] = 0;
 			}
 			if (difftime(timeNow,reflectorTimeout) > 1800 && repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].autoReflector == 0){
 				syslog(LOG_NOTICE,"[%s]Remove repeater from conference %i after conference timeout",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
