@@ -147,10 +147,8 @@ int findRdacRepeater(struct sockaddr_in address){
 		inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
 		inet_ntop(AF_INET, &(rdacList[i].address.sin_addr), str1, INET_ADDRSTRLEN);
 		if (rdacList[i].address.sin_addr.s_addr == address.sin_addr.s_addr){
-			syslog(LOG_NOTICE,"DEBUG findRdacRepeater search %s, found %s, repId %i, repCallsign %s, i %i, maxRep %i",str,str1,rdacList[i].id,rdacList[i].callsign,i,maxRepeaters);
 			return i;
 		}
-		syslog(LOG_NOTICE,"DEBUG pos %i in rdacList, repeaterId %i, repeaterCallsign %s, repeaterAddr %s",i,rdacList[i].id,rdacList[i].callsign,str1);
 	}
 	
 	return 99;

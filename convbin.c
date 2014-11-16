@@ -23,7 +23,7 @@
 
 #include "master_server.h"
 
-bool * convertToBits(unsigned char packet[33]){
+bool * convertToBits(unsigned char packet[34]){
 	static bool bits[264];
 	unsigned char convPacket[33];
 	unsigned char dmrPacket[100];
@@ -31,13 +31,15 @@ bool * convertToBits(unsigned char packet[33]){
 	
 	memset(dmrPacket,0,100);
 	//bit invert
-	for (i=0;i<33;i=i+2){
+	for (i=0;i<32;i=i+2){
 		convPacket[i] = *(packet + i + 1);
 		convPacket[i+1] = *(packet +i);
 		//sprintf(dmrPacket,"%s%02x:%02x:",dmrPacket,convPacket[i],convPacket[i+1]);
+		//printf("i = %i\n",i);
 	}
+	convPacket[32] = *(packet + 33);
 	//syslog(LOG_NOTICE,"DMR packet:%s",dmrPacket);
-	
+	//printf("=====================\n");
 	//convert to bits
 	for (i=0;i<33;i++){
 		for(x=0;x<8;x++){

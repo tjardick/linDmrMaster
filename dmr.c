@@ -393,11 +393,10 @@ void *dmrListener(void *f){
 			syslog(LOG_NOTICE,"Select error, closing socket port %i",baseDmrPort + repPos);
 			close(sockfd);
 			pthread_exit(NULL);
-        }
-		
+        	}
+
 		if (FD_ISSET(sockfd,&fdMaster)) {
 			n = recvfrom(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&cliaddr,&len);
-		
 			if (n>2){
 				slot = buffer[SLOT_OFFSET1] / 16;
 				if (dmrState[slot] == IDLE || repeaterList[repPos].sending[slot]){
@@ -525,10 +524,10 @@ void *dmrListener(void *f){
 							syslog(LOG_NOTICE,"[%s]Voice call started on slot %i src %i dst %i type %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot]);
 							//break;
 						}
-						break;
+						break; 
 
 						case 0x41: //V6 of Hytera repeater firmware sends data header with packet type 41 iso 1
-
+						
                                                 if (slotType[slot] == 0x4444){  //Data header
 							callType[slot] = buffer[TYP_OFFSET1];
 	                                                memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
