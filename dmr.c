@@ -472,7 +472,25 @@ void *dmrListener(void *f){
 											syslog(LOG_NOTICE,"[%s]repeater cannot connect to itself",repeaterList[repPos]);
 											break;
 										}
-										if(repeaterList[l].pearRepeater[2] == 0 && repeaterList[l].conference[2] == 0){
+										if(repeaterList[l].conference[2] != 0){
+											if(repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] != 0){
+												syslog(LOG_NOTICE,"[%s]Need to disconnecting from repeater %i first",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
+												repeaterList[repPos].pearRepeater[2] = 0;
+												repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] = 0;
+											}
+											syslog(LOG_NOTICE,"[%s]connecting to repeater %s, but that repeater is connected to reflector %i, redirecting",repeaterList[repPos].callsign,repeaterList[l].callsign,repeaterList[l].conference[2]);
+											repeaterList[repPos].conference[2] = repeaterList[l].conference[2];
+											time(&reflectorTimeout);
+											reflectorNewState = 2;
+											if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
+											break;
+										}
+										if(repeaterList[l].pearRepeater[2] == 0){
+											if(repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] != 0){
+												syslog(LOG_NOTICE,"[%s]Need to disconnecting from repeater %i first",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
+												repeaterList[repPos].pearRepeater[2] = 0;
+												repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] = 0;
+											}
 											repeaterList[repPos].pearRepeater[2] = repeaterList[l].id;
 											repeaterList[l].pearRepeater[2] = repeaterList[repPos].id;
 											repeaterList[repPos].pearPos[2] = l;
