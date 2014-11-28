@@ -468,7 +468,7 @@ void *dmrListener(void *f){
 							if (slot == 2){
 								for (l=0;l<highestRepeater;l++){
 									if(dstId[2] == repeaterList[l].id){
-										if(dstId[2] == repeaterList[l].id){
+										if(dstId[2] == repeaterList[repPos].id){
 											syslog(LOG_NOTICE,"[%s]repeater cannot connect to itself",repeaterList[repPos]);
 											break;
 										}
