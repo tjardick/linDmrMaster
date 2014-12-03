@@ -42,7 +42,7 @@ LibPath                := "$(LibraryPathSwitch)."
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects=$(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IntermediateDirectory)/webserv$(ObjectSuffix) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) $(IntermediateDirectory)/decode34Rate$(ObjectSuffix) $(IntermediateDirectory)/hyteraDecode$(ObjectSuffix) $(IntermediateDirectory)/aprs$(ObjectSuffix)  $(IntermediateDirectory)/scheduler$(ObjectSuffix)
+Objects=$(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix)  $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) $(IntermediateDirectory)/decode34Rate$(ObjectSuffix) $(IntermediateDirectory)/hyteraDecode$(ObjectSuffix) $(IntermediateDirectory)/aprs$(ObjectSuffix)  $(IntermediateDirectory)/scheduler$(ObjectSuffix)
 
 ##
 ## Main Build Targets 
@@ -102,29 +102,6 @@ $(IntermediateDirectory)/sqlite$(DependSuffix): sqlite.c
 $(IntermediateDirectory)/sqlite$(PreprocessSuffix): sqlite.c
 	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/sqlite$(PreprocessSuffix) "sqlite.c"
 
-$(IntermediateDirectory)/webserv$(ObjectSuffix): webserv.c $(IntermediateDirectory)/webserv$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "webserv.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/webserv$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/webserv$(DependSuffix): webserv.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/webserv$(ObjectSuffix) -MF$(IntermediateDirectory)/webserv$(DependSuffix) -MM "webserv.c"
-
-$(IntermediateDirectory)/webserv$(PreprocessSuffix): webserv.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/webserv$(PreprocessSuffix) "webserv.c"
-
-$(IntermediateDirectory)/htmlreplace$(ObjectSuffix): htmlreplace.c $(IntermediateDirectory)/htmlreplace$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "htmlreplace.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/htmlreplace$(DependSuffix): htmlreplace.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/htmlreplace$(ObjectSuffix) -MF$(IntermediateDirectory)/htmlreplace$(DependSuffix) -MM "htmlreplace.c"
-
-$(IntermediateDirectory)/htmlreplace$(PreprocessSuffix): htmlreplace.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/htmlreplace$(PreprocessSuffix) "htmlreplace.c"
-
-$(IntermediateDirectory)/htmlpost$(ObjectSuffix): htmlpost.c $(IntermediateDirectory)/htmlpost$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "htmlpost.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/htmlpost$(DependSuffix): htmlpost.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/htmlpost$(ObjectSuffix) -MF$(IntermediateDirectory)/htmlpost$(DependSuffix) -MM "htmlpost.c"
-
-$(IntermediateDirectory)/htmlpost$(PreprocessSuffix): htmlpost.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/htmlpost$(PreprocessSuffix) "htmlpost.c"
 
 $(IntermediateDirectory)/convbin$(ObjectSuffix): convbin.c $(IntermediateDirectory)/convbin$(DependSuffix)
 	$(C_CompilerName) $(SourceSwitch) "convbin.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/convbin$(ObjectSuffix) $(IncludePath)
@@ -195,15 +172,6 @@ clean:
 	$(RM) $(IntermediateDirectory)/sqlite$(ObjectSuffix)
 	$(RM) $(IntermediateDirectory)/sqlite$(DependSuffix)
 	$(RM) $(IntermediateDirectory)/sqlite$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(PreprocessSuffix)
 	$(RM) $(IntermediateDirectory)/convbin$(ObjectSuffix)
 	$(RM) $(IntermediateDirectory)/convbin$(DependSuffix)
 	$(RM) $(IntermediateDirectory)/convbin$(PreprocessSuffix)
