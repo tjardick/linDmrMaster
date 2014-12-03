@@ -48,7 +48,7 @@ LibPath                := "$(LibraryPathSwitch)."
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects=$(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IntermediateDirectory)/webserv$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) \
+Objects=$(IntermediateDirectory)/dmr$(ObjectSuffix) $(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IntermediateDirectory)/smaster$(ObjectSuffix) $(IntermediateDirectory)/rdac$(ObjectSuffix) $(IntermediateDirectory)/main$(ObjectSuffix) $(IntermediateDirectory)/convbin$(ObjectSuffix) $(IntermediateDirectory)/BPTC1969$(ObjectSuffix) \
 	$(IntermediateDirectory)/aprs$(ObjectSuffix) $(IntermediateDirectory)/decode34Rate$(ObjectSuffix) $(IntermediateDirectory)/hyteraDecode$(ObjectSuffix) $(IntermediateDirectory)/scheduler$(ObjectSuffix) 
 
 ##
@@ -76,30 +76,6 @@ $(IntermediateDirectory)/dmr$(DependSuffix): dmr.c
 
 $(IntermediateDirectory)/dmr$(PreprocessSuffix): dmr.c
 	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/dmr$(PreprocessSuffix) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/dmr.c"
-
-$(IntermediateDirectory)/htmlpost$(ObjectSuffix): htmlpost.c $(IntermediateDirectory)/htmlpost$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlpost.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/htmlpost$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/htmlpost$(DependSuffix): htmlpost.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/htmlpost$(ObjectSuffix) -MF$(IntermediateDirectory)/htmlpost$(DependSuffix) -MM "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlpost.c"
-
-$(IntermediateDirectory)/htmlpost$(PreprocessSuffix): htmlpost.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/htmlpost$(PreprocessSuffix) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlpost.c"
-
-$(IntermediateDirectory)/htmlreplace$(ObjectSuffix): htmlreplace.c $(IntermediateDirectory)/htmlreplace$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlreplace.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/htmlreplace$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/htmlreplace$(DependSuffix): htmlreplace.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/htmlreplace$(ObjectSuffix) -MF$(IntermediateDirectory)/htmlreplace$(DependSuffix) -MM "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlreplace.c"
-
-$(IntermediateDirectory)/htmlreplace$(PreprocessSuffix): htmlreplace.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/htmlreplace$(PreprocessSuffix) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/htmlreplace.c"
-
-$(IntermediateDirectory)/webserv$(ObjectSuffix): webserv.c $(IntermediateDirectory)/webserv$(DependSuffix)
-	$(C_CompilerName) $(SourceSwitch) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/webserv.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/webserv$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/webserv$(DependSuffix): webserv.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) -MT$(IntermediateDirectory)/webserv$(ObjectSuffix) -MF$(IntermediateDirectory)/webserv$(DependSuffix) -MM "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/webserv.c"
-
-$(IntermediateDirectory)/webserv$(PreprocessSuffix): webserv.c
-	@$(C_CompilerName) $(CmpOptions) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/webserv$(PreprocessSuffix) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/webserv.c"
 
 $(IntermediateDirectory)/sqlite$(ObjectSuffix): sqlite.c $(IntermediateDirectory)/sqlite$(DependSuffix)
 	$(C_CompilerName) $(SourceSwitch) "/home/wim/.gvfs/documents op nas8d5dcf/Projects/DMR/Master_Server/sqlite.c" $(CmpOptions) $(ObjectSwitch)$(IntermediateDirectory)/sqlite$(ObjectSuffix) $(IncludePath)
@@ -190,15 +166,6 @@ clean:
 	$(RM) $(IntermediateDirectory)/dmr$(ObjectSuffix)
 	$(RM) $(IntermediateDirectory)/dmr$(DependSuffix)
 	$(RM) $(IntermediateDirectory)/dmr$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/htmlpost$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/htmlreplace$(PreprocessSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(ObjectSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(DependSuffix)
-	$(RM) $(IntermediateDirectory)/webserv$(PreprocessSuffix)
 	$(RM) $(IntermediateDirectory)/sqlite$(ObjectSuffix)
 	$(RM) $(IntermediateDirectory)/sqlite$(DependSuffix)
 	$(RM) $(IntermediateDirectory)/sqlite$(PreprocessSuffix)
