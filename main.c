@@ -40,7 +40,6 @@ struct reflector  localReflectors[50] = {0};
 
 int rdacSock=0;
 int highestRepeater = 0;
-int restart = 0;
 int numReflectors = 0;
 
 sqlite3 *db;
@@ -161,9 +160,9 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].rdacUpdated = false;
                         repeaterList[i].dmrOnline = false;
                         repeaterList[i].id = 0;
-			repeaterList[i].conference[1] = 0;
-			repeaterList[i].conference[2] = 0;
-			repeaterList[i].autoReflector = 0;
+						repeaterList[i].conference[1] = 0;
+						repeaterList[i].conference[2] = 0;
+						repeaterList[i].autoReflector = 0;
                         repeaterList[i].lastPTPPConnect = 0;
                         repeaterList[i].lastDMRConnect = 0;
                         repeaterList[i].lastRDACConnect = 0;
@@ -233,6 +232,7 @@ void serviceListener(port){
 					case 0x10:{  //PTPP request received
 					if(isDiscarded(cliaddr)) continue;
 					rdacPos = setRdacRepeater(cliaddr);
+					if (rdacPos == 99) continue; //too many repeaters
 					if (difftime(timeNow,rdacList[rdacPos].lastPTPPConnect) < 10) continue;  //Ignore connect request
 					syslog(LOG_NOTICE,"PTPP request from repeater [%s]",str);
 					memcpy(response,buffer,n);
@@ -348,16 +348,6 @@ void serviceListener(port){
 				memcpy(response,buffer,n);
 				response[12]++;
 				sendto(sockfd,response,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-				if (restart){
-					syslog(LOG_NOTICE,"Exiting serviceListener (restart)");
-					return;
-				}
-			}
-		}
-		else{
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting serviceListener (restart)");
-				return;
 			}
 		}
 	}
@@ -705,7 +695,6 @@ int main(int argc, char**argv)
 	pthread_create(&thread, NULL, scheduler,NULL);
 
     for(;;){
-		restart = 0;
 		dmrState[1] = IDLE;
 		dmrState[2] = IDLE;
 		//Get info to get us going

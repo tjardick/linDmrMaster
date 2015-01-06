@@ -65,6 +65,7 @@ struct repeater{
 	unsigned char aprsBeacon[100];
 	unsigned char aprsPHG[7];
 	int autoReflector;
+	int upDated;
 };
 
 
@@ -159,7 +160,6 @@ extern int ownCCInt;
 extern int ownRegionInt;
 extern char version[5];
 extern sqlite3 *db;
-extern int restart;
 extern char page[50];
 extern char aprsUrl[100];
 extern char aprsPort[7];

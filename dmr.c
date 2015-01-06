@@ -381,10 +381,10 @@ void *dmrListener(void *f){
 	len = sizeof(cliaddr);
 
 	autoReconnectTimer = 0;
-        if(repeaterList[repPos].autoReflector != 0){
-                updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
-                syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
-        }
+	if(repeaterList[repPos].autoReflector != 0){
+		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
+		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
+	}
 	for (;;){
 		FD_SET(sockfd, &fdMaster);
 		timeout.tv_sec = 1;
@@ -714,11 +714,6 @@ void *dmrListener(void *f){
 			}
 		}
 		else{
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting dmr thread (restart)");
-				close(sockfd);
-				pthread_exit(NULL);
-			}
 			time(&timeNow);
 			if ((repeaterList[repPos].sending[1] && dmrState[1] != IDLE) || receivingData[1]){
 				if (dmrState[1] == VOICE){
@@ -788,6 +783,12 @@ void *dmrListener(void *f){
 				autoReconnectTimer = 0;
 
 			}
+			/*if (repeaterList[repPos].upDated == 1){
+				syslog(LOG_NOTICE,"Data changed for repeater %s, exiting thread",repeaterList[repPos].callsign);
+				delRdacRepeater(cliaddrOrg);
+				close(sockfd);
+				pthread_exit(NULL);
+			}*/
 		}
 	}
 }

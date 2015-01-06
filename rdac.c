@@ -62,6 +62,7 @@ void delRdacRepeater(struct sockaddr_in address){
 			rdacList[i].pearRepeater[2] = 0;
 			rdacList[i].pearPos[1] = 0;
 			rdacList[i].pearPos[2] = 0;
+			rdacList[i].upDated = 0;
 			rdacList[i].lastPTPPConnect = 0;
 			rdacList[i].lastDMRConnect = 0;
 			rdacList[i].lastRDACConnect = 0;
@@ -92,19 +93,21 @@ int setRdacRepeater(struct sockaddr_in address){
 	inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
 	for(i=0;i<maxRepeaters;i++){
 		if (rdacList[i].address.sin_addr.s_addr == address.sin_addr.s_addr){
-			//syslog(LOG_NOTICE,"[%s]Repeater still in RDAC list",str); 
-			return i;
+			break;
 		}
 	}
 	
-	
-	for(i=0;i<maxRepeaters;i++){
-		if (rdacList[i].address.sin_addr.s_addr == 0) break;
+	if (i == maxRepeaters){
+		for(i=0;i<maxRepeaters;i++){
+			if (rdacList[i].address.sin_addr.s_addr == 0) break;
+		}
 	}
+	
 	if (i == maxRepeaters){
 		syslog(LOG_NOTICE,"Not possible to add repeater, maximum number reached");
 		return 99;
 	}
+	
 	rdacList[i].address = address;
 	inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
 	//See if there is already info in the database based on IP address
@@ -129,10 +132,10 @@ int setRdacRepeater(struct sockaddr_in address){
 			,rdacList[i].firmware,rdacList[i].mode,rdacList[i].txFreq,rdacList[i].shift,rdacList[i].language,i,str);
 			sqlite3_finalize(stmt);
 			closeDatabase(db);
-			return 1;
+			return i;
 		}
 	}
-	syslog(LOG_NOTICE,"Repeater not found in RDAC list, assigning pos %i",i);
+	syslog(LOG_NOTICE,"Repeater not found in database based on IP, assigning pos %i",i);
 	closeDatabase(db);
 	return i;
 }
@@ -405,11 +408,6 @@ void *rdacListener(void* f){
 			pthread_exit(NULL);
         }
 		if (FD_ISSET(sockfd,&fdMaster)) {
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting RDAC thread (restart)");
-				close(sockfd);
-				pthread_exit(NULL);
-			}
 			n = recvfrom(sockfd,buffer,500,0,(struct sockaddr *)&cliaddr,&len);
 			if (n>2){
 			}
@@ -427,11 +425,6 @@ void *rdacListener(void* f){
 			}
 		}
 		else{
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting RDAC thread (restart)");
-				close(sockfd);
-				pthread_exit(NULL);
-			}
 			time(&timeNow);
 			if (difftime(timeNow,pingTime) > 60) {
 				repPos = findRdacRepeater(cliaddr);
