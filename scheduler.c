@@ -67,7 +67,7 @@ void *scheduler(){
 				
 		id = 0;
 		sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector FROM repeaters WHERE upDated = 1");
-		if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
+		if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
 			if (sqlite3_step(stmt) == SQLITE_ROW){
 				id = sqlite3_column_int(stmt,0);
 				for(i=0;i<highestRepeater;i++){
@@ -87,7 +87,11 @@ void *scheduler(){
 						syslog(LOG_NOTICE,"Repeater data changed from web %s %s %s %s %s %s %s %s %s %s %s %i on pos %i",repeaterList[i].callsign,repeaterList[i].hardware
 						,repeaterList[i].firmware,repeaterList[i].mode,repeaterList[i].txFreq,repeaterList[i].shift,repeaterList[i].language
 						,repeaterList[i].geoLocation,repeaterList[i].aprsPass,repeaterList[i].aprsBeacon,repeaterList[i].aprsPHG,repeaterList[i].autoReflector,i);
-						updateRepeaterTable(2,repeaterList[i].autoReflector,i);
+						repeaterList[i].conference[2] = repeaterList[i].autoReflector;
+						if (repeaterList[i].pearRepeater[2] != 0){
+							repeaterList[i].pearRepeater[2] = 0;
+							repeaterList[repeaterList[i].pearPos[2]].pearRepeater[2] = 0;
+						}
 					}
 				}
 			}
@@ -97,7 +101,7 @@ void *scheduler(){
 		if (id !=0){
 			sprintf(SQLQUERY,"UPDATE repeaters SET upDated = 0");
 			if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
-				syslog(LOG_NOTICE,"Failed to reset updated in repeater table: %s",sqlite3_errmsg(dbase));
+				syslog(LOG_NOTICE,"Failed to reset 'updated' in repeater table: %s",sqlite3_errmsg(dbase));
 			}
 		}
 		

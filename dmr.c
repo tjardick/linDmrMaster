@@ -781,14 +781,7 @@ void *dmrListener(void *f){
 				repeaterList[repPos].conference[2] = repeaterList[repPos].autoReflector;
 				reflectorStatus(sockfd,repeaterList[repPos].address,2,repeaterList[repPos].conference[2],repPos);
 				autoReconnectTimer = 0;
-
 			}
-			/*if (repeaterList[repPos].upDated == 1){
-				syslog(LOG_NOTICE,"Data changed for repeater %s, exiting thread",repeaterList[repPos].callsign);
-				delRdacRepeater(cliaddrOrg);
-				close(sockfd);
-				pthread_exit(NULL);
-			}*/
 		}
 	}
 }

@@ -159,7 +159,9 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].rdacOnline = false;
                         repeaterList[i].rdacUpdated = false;
                         repeaterList[i].dmrOnline = false;
+                        repeaterList[i].rdacUpdateAttempts = 0;
                         repeaterList[i].id = 0;
+                        repeaterList[i].upDated = 0;
 						repeaterList[i].conference[1] = 0;
 						repeaterList[i].conference[2] = 0;
 						repeaterList[i].autoReflector = 0;
@@ -287,9 +289,9 @@ void serviceListener(port){
 						syslog(LOG_NOTICE,"DMR request from repeater [%s - %s] already assigned a DMR port, not starting thread",str,repeaterList[repPos].callsign);
 					}
 					else{  //Start a new DMR thread for this repeater
-                                                struct sockInfo *param = malloc(sizeof(struct sockInfo));
-                                                param->address = cliaddr;
-                                                param->port = redirectPort;
+						struct sockInfo *param = malloc(sizeof(struct sockInfo));
+						param->address = cliaddr;
+						param->port = redirectPort;
 						pthread_create(&thread, NULL, dmrListener,param);
 					}
 					sendto(sockfd,response,n+4,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
@@ -329,6 +331,7 @@ void serviceListener(port){
 					memcpy(response + n,port,4);
 					if (rdacList[rdacPos].rdacOnline){  //If repeater is not offline, but we still get a request, just point it back to old thread
 						syslog(LOG_NOTICE,"RDAC request from repeater [%s - %s] already assigned a RDAC port, not starting thread",str,rdacList[rdacPos].callsign);
+						rdacList[rdacPos].rdacUpdateAttempts = 0;
 					}
 					else{  //Start a new RDAC thread for this repeater
 						struct sockInfo *param = malloc(sizeof(struct sockInfo));
@@ -643,39 +646,17 @@ int loadTalkGroups(){
 int main(int argc, char**argv)
 {
 	
-	// Our process ID and Session ID
-	pid_t pid,sid;
-	
-	/*printf("Becoming a daemon...\n");
-	// Fork off the parent process
+	int pid;
 	pid = fork();
-    if (pid < 0) {
-		exit(EXIT_FAILURE);
-    }
-	
-	// If we got a good PID, then we can exit the parent process. 
-    if (pid > 0) {
-		exit(EXIT_SUCCESS);
-    }
-	
-	// Change the file mode mask 
-    umask(0);*/
+	if (pid == 0){
+		static char *argv[]={"webGui","-F",NULL};
+		execv("./webGui",argv);
+		exit(127);
+	}
     
 	setlogmask (LOG_UPTO (LOG_NOTICE));
 	openlog("Master-server", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
      
-	// Create a new SID for the child process 
-    /*sid = setsid();
-    if (sid < 0) {
-		// Log the failure 
-		exit(EXIT_FAILURE);
-    }
-	
-	// Close out the standard file descriptors 
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);*/
-	
 	pthread_t thread;
 	int port;
 	int dbInit;
@@ -694,27 +675,16 @@ int main(int argc, char**argv)
 	//Start scheduler thread
 	pthread_create(&thread, NULL, scheduler,NULL);
 
-    for(;;){
-		dmrState[1] = IDLE;
-		dmrState[2] = IDLE;
-		//Get info to get us going
-		if(!getMasterInfo()) return 0;
-		//Load the allowed talkgroups
-		if(!loadTalkGroups()) return 0;
-		getLocalReflectors();
-		//Start sMaster Thread
-		pthread_create(&thread, NULL, sMasterThread,NULL);
-		//Start listening on the service port
-		openAprsSock();
-		serviceListener(servicePort);
-		//If we got here, we are restarting, waiting for all threads to end
-		sleep(6);
-		close(aprsSockFd);
-		master = emptyMaster;
-		highestRepeater = 0;
-		for (i=0;i<99;i++){
-			repeaterList[i] = emptyRepeater;
-			rdacList[i] = emptyRepeater;
-		}
-	}
+	dmrState[1] = IDLE;
+	dmrState[2] = IDLE;
+	//Get info to get us going
+	if(!getMasterInfo()) return 0;
+	//Load the allowed talkgroups
+	if(!loadTalkGroups()) return 0;
+	getLocalReflectors();
+	//Start sMaster Thread
+	pthread_create(&thread, NULL, sMasterThread,NULL);
+	//Start listening on the service port
+	openAprsSock();
+	serviceListener(servicePort);
 }
