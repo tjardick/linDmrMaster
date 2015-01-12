@@ -130,28 +130,33 @@ void sendAprs(struct gpsCoordinates gpsData, int radioId,int destId, struct repe
 
         case 5050:	//fixed (home)
         aprsCor[18] = 45;
-	sprintf(radioIdent.aprsSuffix,"");
+		sprintf(radioIdent.aprsSuffix,"");
         break;
-	case 5055:	//Different network  -5 (node)
-	aprsCor[18] = 110;
-	sprintf(radioIdent.aprsSuffix,"-5");
-	break;
-	case 5056:	//Special activity -6  (Tent)
-	aprsCor[18] = 59;
-	sprintf(radioIdent.aprsSuffix,"-6");
-	break;
-	case 5057:	//Handheld -7 (Runner)
-	aprsCor[18] = 91;
-	sprintf(radioIdent.aprsSuffix,"-7");
-	break;
-	case 5058:	//mobile station (Camping car,motor cycle,Bicicle) -8  (RV)
-	aprsCor[18] = 82;
-	sprintf(radioIdent.aprsSuffix,"-8");
-	break;
-	case 5059:	//mobile station  -9 (car)
-	aprsCor[18] = 62;
-	sprintf(radioIdent.aprsSuffix,"-9");
-	break;
+		
+		case 5055:	//Different network  -5 (node)
+		aprsCor[18] = 110;
+		sprintf(radioIdent.aprsSuffix,"-5");
+		break;
+
+		case 5056:	//Special activity -6  (Tent)
+		aprsCor[18] = 59;
+		sprintf(radioIdent.aprsSuffix,"-6");
+		break;
+	
+		case 5057:	//Handheld -7 (Runner)
+		aprsCor[18] = 91;
+		sprintf(radioIdent.aprsSuffix,"-7");
+		break;
+	
+		case 5058:	//mobile station (Camping car,motor cycle,Bicicle) -8  (RV)
+		aprsCor[18] = 82;
+		sprintf(radioIdent.aprsSuffix,"-8");
+		break;
+
+		case 5059:	//mobile station  -9 (car)
+		aprsCor[18] = 62;
+		sprintf(radioIdent.aprsSuffix,"-9");
+		break;
 	}
 	sprintf(toSend,"user %s pass %s vers DMRgate 1.0\n%s%s>APRS,%s,qAR,%s:!%s %s\n",repeater.callsign,repeater.aprsPass,radioIdent.callsign,radioIdent.aprsSuffix,repeater.callsign,repeater.callsign,aprsCor,radioIdent.aprsBeacon);
 
@@ -173,7 +178,8 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
 
         reti = regcomp(&regex, "^[0-9][0-9][0-9][0-9][.][0-9][0-9][NZ]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Ccould not compile regex latitude",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Could not compile regex latitude",repeater.callsign);
+				regfree(&regex);
                 return 0;
         }
         reti = regexec(&regex,gpsData.latitude,0,NULL,0);
@@ -182,33 +188,37 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
                 regfree(&regex);
                 return 0;
         }
-        regfree(&regex);
-
+		regfree(&regex);
+		
         reti = regcomp(&regex, "^[0-9][0-9][0-9][0-9][0-9][.][0-9][0-9][EW]$", 0);
         if(reti){
-                syslog(LOG_NOTICE,"[%s]Ccould not compile regex longitude",repeater.callsign);
+                syslog(LOG_NOTICE,"[%s]Could not compile regex longitude",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
+
         reti = regexec(&regex,gpsData.longitude,0,NULL,0);
         if(reti == REG_NOMATCH){
                 syslog(LOG_NOTICE,"[%s]Corrupt longitude received",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
-
+		regfree(&regex);
+		
         reti = regcomp(&regex, "^[0-9][0-9][0-9]$", 0);
         if(reti){
                 syslog(LOG_NOTICE,"[%s]Could not compile regex heading",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
+
         reti = regexec(&regex,gpsData.heading,0,NULL,0);
         if(reti == REG_NOMATCH){
                 syslog(LOG_NOTICE,"[%s]Corrupt heading received",repeater.callsign);
                 regfree(&regex);
                 return 0;
         }
+		regfree(&regex);
 
         reti = regcomp(&regex, "^[0-9.][0-9.][0-9.]$", 0);
         if(reti){
@@ -216,6 +226,7 @@ int checkCoordinates(struct gpsCoordinates gpsData, struct repeater repeater){
                 regfree(&regex);
                 return 0;
         }
+
         reti = regexec(&regex,gpsData.speed,0,NULL,0);
         if(reti == REG_NOMATCH){
                 syslog(LOG_NOTICE,"[%s]Corrupt speed received",repeater.callsign);

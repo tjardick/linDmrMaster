@@ -28,7 +28,7 @@ int maxRepeaters = 20;
 int echoId = 9990;
 int echoSlot = 1;
 int rrsGpsId = 500;
-char version[5] = "2.1";
+char version[5] = "3.0";
 
 struct repeater repeaterList[100] = {0};
 struct repeater emptyRepeater = {0};
