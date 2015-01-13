@@ -88,7 +88,7 @@ int initDatabase(sqlite3 *db){
 	char SQLQUERY[1000];
 	
 	if (!isTableExisting(db,"master")){
-		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId int default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080')");
+		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId int default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080', echoSlot integer default 1)");
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			sprintf(SQLQUERY,"INSERT INTO master (repTS1) VALUES ('')");
 			if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
@@ -123,7 +123,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"repeaters")){
-		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default '')");
+		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default ''', currentReflector integer default 0, autoReflector integer default 0, userName default '', upDated integer default 0, lastRdacUpdate varchar(20) default '1970-1-1 00:00:00', online integer default 0)");
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table repeater created");
 		}
@@ -145,7 +145,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"rrs")){
-		sprintf(SQLQUERY,"CREATE TABLE rrs (radioId INTEGER default 0 PRIMARY KEY, callsign VARCHAR(32) default '',name VARCHAR(32) default '', registerTime VARCHAR(20) default '1970-01-01 00:00:00', onRepeater VARCHAR(32) default '')");
+		sprintf(SQLQUERY,"CREATE TABLE rrs (radioId INTEGER default 0 PRIMARY KEY, callsign VARCHAR(32) default '',name VARCHAR(32) default '', registerTime VARCHAR(20) default '1970-01-01 00:00:00', onRepeater VARCHAR(32) default '', unixTime long)");
 		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table rrs created");
 		}
@@ -189,9 +189,20 @@ int initDatabase(sqlite3 *db){
 	}
 
 
+	if (!isTableExisting(db,"access")){
+		sprintf(SQLQUERY,"CREATE TABLE access(userName varchar(20) default '' PRIMARY KEY, password varchar(20) default '', role varchar(30) default 'log');");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table access created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+	
 	//check for new fields added later in development
 
-        if (!isFieldExisting(db,"repeaters","currentReflector")){
+        /*if (!isFieldExisting(db,"repeaters","currentReflector")){
                 sprintf(SQLQUERY,"alter table repeaters add currentReflector integer default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
                         syslog(LOG_NOTICE,"field currentreflector in repeaters created");
@@ -200,40 +211,8 @@ int initDatabase(sqlite3 *db){
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
                         return 0;
                 }
-        }
+        }*/
 
-        if (!isFieldExisting(db,"repeaters","autoReflector")){
-                sprintf(SQLQUERY,"alter table repeaters add autoReflector integer default 0");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field autoReflector in repeaters created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-        if (!isFieldExisting(db,"master","echoSlot")){
-                sprintf(SQLQUERY,"alter table master add echoSlot integer default 1");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field echoSlot in master created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-        if (!isFieldExisting(db,"rrs","unixTime")){
-                sprintf(SQLQUERY,"alter table rrs unixTime long default 0");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field echoSlot in master created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
 
 	//Clean database
 	sprintf(SQLQUERY,"update repeaters set currentReflector = 0");
