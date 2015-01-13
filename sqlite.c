@@ -123,7 +123,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"repeaters")){
-		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default ''', currentReflector integer default 0, autoReflector integer default 0, userName default '', upDated integer default 0, lastRdacUpdate varchar(20) default '1970-1-1 00:00:00', online integer default 0)");
+		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default '', currentReflector integer default 0, autoReflector integer default 0, userName default '', upDated integer default 0, lastRdacUpdate varchar(20) default '1970-1-1 00:00:00', online integer default 0)");
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table repeater created");
 		}
