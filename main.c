@@ -286,6 +286,8 @@ void serviceListener(port){
 					rport[3] = redirectPort >> 8;
 					memcpy(response + n,rport,4);
 					if (repeaterList[repPos].dmrOnline){  //If repeater is not offline, but we still get a request, just point it back to old thread
+						rdacList[repPos].rdacUpdateAttempts = 0;
+						rdacList[repPos].rdacUpdated = false;
 						syslog(LOG_NOTICE,"DMR request from repeater [%s - %s] already assigned a DMR port, not starting thread",str,repeaterList[repPos].callsign);
 					}
 					else{  //Start a new DMR thread for this repeater
@@ -642,6 +644,22 @@ int loadTalkGroups(){
 	return 0;
 }
 
+void setRepeatersOffline(){
+	char SQLQUERY[400];
+	char timeStamp[20];
+
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	strftime(timeStamp,sizeof(timeStamp),"%Y-%m-%d %H:%M:%S",t);
+	syslog(LOG_NOTICE,"Setting all repeaters to status offline in database");
+	db = openDatabase();
+	sprintf(SQLQUERY,"UPDATE repeaters set online = 0, timeStamp = '%s'",timeStamp);
+	if (sqlite3_exec(db,SQLQUERY,0,0,0) != 0){
+		syslog(LOG_NOTICE,"Failed to update repeater table: %s",sqlite3_errmsg(db));
+		syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+	}
+	closeDatabase(db);
+}
 
 int main(int argc, char**argv)
 {
@@ -682,6 +700,7 @@ int main(int argc, char**argv)
 	//Load the allowed talkgroups
 	if(!loadTalkGroups()) return 0;
 	getLocalReflectors();
+	setRepeatersOffline();
 	//Start sMaster Thread
 	pthread_create(&thread, NULL, sMasterThread,NULL);
 	//Start listening on the service port

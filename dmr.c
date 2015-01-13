@@ -261,9 +261,9 @@ void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in ad
 
 
 void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int callType, unsigned char repeater[17]){
-        char SQLQUERY[400];
-        sqlite3 *dbase;
-        sqlite3_stmt *stmt;
+	char SQLQUERY[400];
+	sqlite3 *dbase;
+	sqlite3_stmt *stmt;
 	unsigned char callsign[33] = "";
 	unsigned char name[33] = "";
 	unsigned char callGroup[16];
@@ -294,18 +294,37 @@ void logTraffic(int srcId,int dstId,int slot,unsigned char serviceType[16],int c
 
 	sprintf(SQLQUERY,"REPLACE into traffic (senderId,senderCallsign,senderName,targetId,channel,serviceType,callType,timeStamp,onRepeater) VALUES (%i,'%s','%s',%i,%i,'%s','%s',%lu,'%s')",srcId,callsign,name,dstId,slot,serviceType,callGroup,time(NULL),repeater);
         if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
-                syslog(LOG_NOTICE,"Failed to update traffic table: %s",sqlite3_errmsg(dbase));
-		syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+            syslog(LOG_NOTICE,"Failed to update traffic table: %s",sqlite3_errmsg(dbase));
+			syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
         }
 	if(strcmp(serviceType,"Voice")== 0){
 		sprintf(SQLQUERY,"REPLACE into voiceTraffic (senderId,senderCallsign,senderName,targetId,channel,serviceType,callType,timeStamp,onRepeater) VALUES (%i,'%s','%s',%i,%i,'%s','%s',%lu,'%s')",srcId,callsign,name,dstId,slot,serviceType,callGroup,time(NULL),repeater);
         	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
-                	syslog(LOG_NOTICE,"Failed to update voiceTraffic table: %s",sqlite3_errmsg(dbase));
-			syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+                syslog(LOG_NOTICE,"Failed to update voiceTraffic table: %s",sqlite3_errmsg(dbase));
+				syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
         	}
 	}
         closeDatabase(dbase);
 
+}
+
+void updateRepeaterStatus(unsigned char repeater[17],int status){
+	char SQLQUERY[400];
+	sqlite3 *dbase;
+	sqlite3_stmt *stmt;
+	char timeStamp[20];
+
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	strftime(timeStamp,sizeof(timeStamp),"%Y-%m-%d %H:%M:%S",t);
+	syslog(LOG_NOTICE,"[%s]Setting repeater to status %i in database",repeater,status);
+	dbase = openDatabase();
+	sprintf(SQLQUERY,"UPDATE repeaters set online = %i, timeStamp = '%s' where callsign = '%s'",status,timeStamp,repeater);
+	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+		syslog(LOG_NOTICE,"Failed to update repeater table: %s",sqlite3_errmsg(dbase));
+		syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+	}
+	closeDatabase(dbase);
 }
 
 void *dmrListener(void *f){
@@ -385,6 +404,7 @@ void *dmrListener(void *f){
 		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
 		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
 	}
+	updateRepeaterStatus(repeaterList[repPos].callsign,1);
 	for (;;){
 		FD_SET(sockfd, &fdMaster);
 		timeout.tv_sec = 1;
@@ -760,6 +780,7 @@ void *dmrListener(void *f){
 				syslog(LOG_NOTICE,"PING timeout on DMR port %i repeater %s, exiting thread",baseDmrPort + repPos,repeaterList[repPos].callsign);
 				syslog(LOG_NOTICE,"Removing repeater from list position %i",repPos);
 				updateRepeaterTable(1,repeaterList[repPos].autoReflector,repPos);
+				updateRepeaterStatus(repeaterList[repPos].callsign,0);
 				delRepeater(cliaddrOrg);
 				if (repPos + 1 == highestRepeater) highestRepeater--;
 				delRdacRepeater(cliaddrOrg);

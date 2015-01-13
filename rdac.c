@@ -331,7 +331,7 @@ bool getRepeaterInfo(int sockfd,int repPos,struct sockaddr_in cliaddrOrg,sqlite3
 	if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			sqlite3_finalize(stmt);
-			sprintf(SQLQUERY,"UPDATE repeaters SET callsign = '%s', txFreq = '%s', shift = '%s', hardware = '%s', firmware = '%s', mode = '%s', currentAddress = %lu, timeStamp = '%s', ipAddress = '%s'  WHERE repeaterId = %i",
+			sprintf(SQLQUERY,"UPDATE repeaters SET callsign = '%s', txFreq = '%s', shift = '%s', hardware = '%s', firmware = '%s', mode = '%s', currentAddress = %lu, lastRdacUpdate = '%s', ipAddress = '%s'  WHERE repeaterId = %i",
 			rdacList[repPos].callsign,rdacList[repPos].txFreq,rdacList[repPos].shift,rdacList[repPos].hardware,rdacList[repPos].
 			firmware,rdacList[repPos].mode,(long)cliaddrOrg.sin_addr.s_addr,timeStamp,str,rdacList[repPos].id);
 			sqlite3_exec(dbase,SQLQUERY,0,0,0);

@@ -68,7 +68,7 @@ void *scheduler(){
 		id = 0;
 		sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector FROM repeaters WHERE upDated = 1");
 		if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
-			if (sqlite3_step(stmt) == SQLITE_ROW){
+			while (sqlite3_step(stmt) == SQLITE_ROW){
 				id = sqlite3_column_int(stmt,0);
 				for(i=0;i<highestRepeater;i++){
 					if(repeaterList[i].id == id && repeaterList[i].dmrOnline){
