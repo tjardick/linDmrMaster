@@ -392,7 +392,7 @@ int getMasterInfo(){
     syslog(LOG_NOTICE,"sMaster info: ownName %s, ownCountryCode %s, ownRegion %s, sMasterIp %s, sMasterPort %s",
 	master.ownName,master.ownCountryCode,master.ownRegion,master.sMasterIp,master.sMasterPort);
 	
-	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot FROM master");
+	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseDmrPort FROM master");
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			servicePort = sqlite3_column_int(stmt,0);
@@ -405,7 +405,7 @@ int getMasterInfo(){
 			sprintf(aprsUrl,"%s",sqlite3_column_text(stmt,7));
 			sprintf(aprsPort,"%s",sqlite3_column_text(stmt,8));
 			echoSlot = sqlite3_column_int(stmt,9);
-
+			baseRdacPort = sqlite3_column_int(stmt,10);
 		}
 		else{
 			syslog(LOG_NOTICE,"failed to read masterInfo, no row");
