@@ -191,6 +191,10 @@ bool getRepeaterInfo(int sockfd,int repPos,struct sockaddr_in cliaddrOrg,sqlite3
 	FD_ZERO(&master);
 	len = sizeof(cliaddr);
 	fp=fopen("rdac.in","r");
+	if (fp == NULL){
+		syslog(LOG_NOTICE,"rdac.in file not found in Master_Server directory, please copy this file");
+		return false;
+	}
 	while (!feof(fp)){
 		if (fgets(line,400,fp) != NULL){
 			lineread = strtok(line,":");
