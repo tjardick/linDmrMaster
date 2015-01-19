@@ -178,7 +178,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"localReflectors")){
-		sprintf(SQLQUERY,"CREATE TABLE localReflectors(id int primary key,name varchar(50))");
+		sprintf(SQLQUERY,"CREATE TABLE localReflectors(id int primary key,name varchar(50),type int default 0)");
 		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table localReflectors created");
 		}
