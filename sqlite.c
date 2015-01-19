@@ -202,16 +202,16 @@ int initDatabase(sqlite3 *db){
 	
 	//check for new fields added later in development
 
-        /*if (!isFieldExisting(db,"repeaters","currentReflector")){
-                sprintf(SQLQUERY,"alter table repeaters add currentReflector integer default 0");
+        if (!isFieldExisting(db,"localReflectors","type")){
+                sprintf(SQLQUERY,"alter table localReflectors add type integer default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field currentreflector in repeaters created");
+                        syslog(LOG_NOTICE,"field type in localReflectors created");
                 }
                 else{
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
                         return 0;
                 }
-        }*/
+        }
 
 
 	//Clean database
