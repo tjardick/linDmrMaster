@@ -47,6 +47,7 @@ struct repeater{
 	int rdacUpdateAttempts;
 	bool sending[3];
 	int conference[3];
+	int conferenceType[3];
 	int pearRepeater[3];
 	int pearPos[3];
 	int id;
@@ -127,6 +128,7 @@ struct gpsCoordinates{
 struct reflector{
 	int id;
 	unsigned char name[55];
+	int type;
 };
 
 typedef enum {VOICE, DATA, IDLE} state;

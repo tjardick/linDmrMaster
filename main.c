@@ -392,7 +392,7 @@ int getMasterInfo(){
     syslog(LOG_NOTICE,"sMaster info: ownName %s, ownCountryCode %s, ownRegion %s, sMasterIp %s, sMasterPort %s",
 	master.ownName,master.ownCountryCode,master.ownRegion,master.sMasterIp,master.sMasterPort);
 	
-	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseDmrPort FROM master");
+	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseRdacPort FROM master");
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			servicePort = sqlite3_column_int(stmt,0);
@@ -439,11 +439,12 @@ void getLocalReflectors(){
         sqlite3_stmt *stmt;
 
         db = openDatabase();
-        sprintf(SQLQUERY,"SELECT id,name FROM localReflectors");
+        sprintf(SQLQUERY,"SELECT id,name,type FROM localReflectors");
         if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
                 while (sqlite3_step(stmt) == SQLITE_ROW){
                         localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
                         sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
+						localReflectors[numReflectors].type = sqlite3_column_int(stmt,2);
 			syslog(LOG_NOTICE,"Added reflector %i %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name);
 			numReflectors++;
                 }

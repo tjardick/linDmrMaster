@@ -151,12 +151,29 @@ void updateRepeaterTable(int status, int reflector, int repPos){
         closeDatabase(dbase);
 }
 
+void playVoice(int sockfd, struct sockaddr_in address, char fileName[100],int repPos){
+	FILE *file;
+	int slotType=0,frameType=0;
+	unsigned char buffer[VFRAMESIZE];
+	sleep(1);
+	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
+	if (file = fopen(fileName,"rb")){
+		while (fread(buffer,VFRAMESIZE,1,file)){
+			sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+			slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+			frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+			if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+		}
+        fclose(file);
+	}
+	else{
+		syslog(LOG_NOTICE,"File %s not found",fileName);
+	}
+}
+
 void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int reflector, int repPos){
 
 	char fileName[100];
-        FILE *file;
-        int slotType=0,frameType=0;
-	unsigned char buffer[VFRAMESIZE];
 
 	if(status ==2){
 	        sprintf(fileName,"connected.voice");
@@ -165,20 +182,35 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int refle
 	        sprintf(fileName,"disconnected.voice");
 	}
 	updateRepeaterTable(status,reflector,repPos);
-	sleep(1);
-	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
-        if (file = fopen(fileName,"rb")){
-                while (fread(buffer,VFRAMESIZE,1,file)){
-                        sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
-                        slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
-                        frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
-                        if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
-                }
-        fclose(file);
-        }
-        else{
-                syslog(LOG_NOTICE,"File %s not found",fileName);
-        }
+	playVoice(sockfd,address,fileName,repPos);	
+}
+
+void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int repPos){
+	char fileName[100];
+
+	switch (status) {
+		case 1:
+		sprintf(fileName,"connect_own.voice");
+		break;
+
+		case 2:
+		sprintf(fileName,"deffered_reflector.voice");
+		break;
+
+		case 3:
+		sprintf(fileName,"connected_repeater.voice");
+		break;
+
+		case 4:
+		sprintf(fileName,"repeater_busy.voice");
+		break;
+
+		case 5:
+		sprintf(fileName,"disconnected_repeater.voice");
+		break;
+		
+	}
+	playVoice(sockfd,address,fileName,repPos);
 }
 
 void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in address, int srcId, int repPos){
@@ -363,6 +395,8 @@ void *dmrListener(void *f){
 	unsigned char decodedString[3][300];
 	int reflectorNewState = 0;
 	bool txStart;
+	int repConnectNewState = 0;
+	unsigned char reflectorState[50];
 
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
@@ -456,7 +490,7 @@ void *dmrListener(void *f){
 								sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
 								sendto(sMaster.sockfd,webUserInfo,strlen(webUserInfo),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 							}
-							if (dstId[slot] == echoId && slot == echoSlot){
+							if ((dstId[slot] == echoId && slot == echoSlot) || (dstId[slot] == 9 && srcId[slot] == 4000)){
 								syslog(LOG_NOTICE,"[%s]Echo test started on slot %i src %i",repeaterList[repPos].callsign,slot,srcId[slot]);
 								echoTest(buffer,sockfd,repeaterList[repPos].address,srcId[slot],repPos);
 								repeaterList[repPos].sending[slot] = false;
@@ -466,21 +500,35 @@ void *dmrListener(void *f){
 								syslog(LOG_NOTICE,"[%s]Disconnecting from repeater %i",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
 								repeaterList[repPos].pearRepeater[2] = 0;
 								repeaterList[repeaterList[repPos].pearPos[2]].pearRepeater[2] = 0;
+								repConnectNewState = 5;
 							}
 							if(dstId[2] == 4000 && repeaterList[repPos].conference[2] != 0){
 								syslog(LOG_NOTICE,"[%s]Removing repeater from conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 								repeaterList[repPos].conference[2] = 0;
 								reflectorNewState = 1;
 								if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
+								if(repeaterList[repPos].conferenceType[2] ==1){
+									if(sMaster.online){
+										sprintf(reflectorState,"%6.6s@%6.6s@%4.4i\n",repeaterList[repPos].callsign,repeaterList[repPos].id,repeaterList[repPos].conference[2]);
+										sendto(sMaster.sockfd,reflectorState,strlen(reflectorState),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+									}
+								}
 							}
 							if(dstId[2] > 4000 && dstId[2] < 5000){
 								for(l=0;l<numReflectors;l++){
 									if(localReflectors[l].id = dstId[2]){
 										repeaterList[repPos].conference[2] = dstId[2];
-										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name);
+										repeaterList[repPos].conferenceType[2] = localReflectors[l].type;
+										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s type %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name,localReflectors[l].type);
 										time(&reflectorTimeout);
 										reflectorNewState = 2;
 										if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
+										if (localReflectors[l].type == 1){
+											if(sMaster.online){
+												sprintf(reflectorState,"%6.6s@%6.6s@%4.4i\n",repeaterList[repPos].callsign,repeaterList[repPos].id,repeaterList[repPos].conference[2]);
+												sendto(sMaster.sockfd,reflectorState,strlen(reflectorState),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+											}
+										}
 										break;
 									}
 								}
@@ -489,7 +537,8 @@ void *dmrListener(void *f){
 								for (l=0;l<highestRepeater;l++){
 									if(dstId[2] == repeaterList[l].id){
 										if(dstId[2] == repeaterList[repPos].id){
-											syslog(LOG_NOTICE,"[%s]repeater cannot connect to itself",repeaterList[repPos]);
+											syslog(LOG_NOTICE,"[%s]repeater cannot connect to itself",repeaterList[repPos].callsign);
+											repConnectNewState = 1;
 											break;
 										}
 										if(repeaterList[l].conference[2] != 0){
@@ -501,6 +550,7 @@ void *dmrListener(void *f){
 											syslog(LOG_NOTICE,"[%s]connecting to repeater %s, but that repeater is connected to reflector %i, redirecting",repeaterList[repPos].callsign,repeaterList[l].callsign,repeaterList[l].conference[2]);
 											repeaterList[repPos].conference[2] = repeaterList[l].conference[2];
 											time(&reflectorTimeout);
+											repConnectNewState = 2;
 											reflectorNewState = 2;
 											if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 											break;
@@ -521,11 +571,13 @@ void *dmrListener(void *f){
 											}
 											if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 											syslog(LOG_NOTICE,"[%s]connecting to repeater %s",repeaterList[repPos].callsign,repeaterList[l].callsign);
+											repConnectNewState = 3;
 											time(&repeaterList[repPos].pearTimeout);
 											time(&repeaterList[l].pearTimeout);
 										}
 										else{
 											syslog(LOG_NOTICE,"[%s]connect to repeater %s failed,busy",repeaterList[repPos].callsign,repeaterList[l].callsign);
+											repConnectNewState = 4;
 										}
 										break;
 									}
@@ -538,6 +590,7 @@ void *dmrListener(void *f){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 									time(&reflectorTimeout);
 									if (autoReconnectTimer !=0) time(&autoReconnectTimer);
+									if (repeaterList[repPos].conferenceType[2] == 1) toSend.sMaster = true;
 								}
 								else if(repeaterList[repPos].pearRepeater[2] != 0 && slot == 2 && dstId[2] == 9){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to repeater %i",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
@@ -566,17 +619,17 @@ void *dmrListener(void *f){
 
 						case 0x41: //V6 of Hytera repeater firmware sends data header with packet type 41 iso 1
 						
-                                                if (slotType[slot] == 0x4444){  //Data header
+						if (slotType[slot] == 0x4444){  //Data header
 							callType[slot] = buffer[TYP_OFFSET1];
-	                                                memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
-        	                                        bits = convertToBits(dmrPacket); //convert it to bits
-                                                        repeaterList[repPos].sending[slot] = true;
-                                                        receivingData[slot] = true;
-                                                        dataBlocks[slot] = 0;
-                                                        headerDecode[slot] = decodeDataHeader(bits);
-                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
-                                                        break;
-                                                }
+							memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+							bits = convertToBits(dmrPacket); //convert it to bits
+							repeaterList[repPos].sending[slot] = true;
+							receivingData[slot] = true;
+							dataBlocks[slot] = 0;
+							headerDecode[slot] = decodeDataHeader(bits);
+							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
+							break;
+						}
 
 						
 						case 0x01:
@@ -588,18 +641,18 @@ void *dmrListener(void *f){
 							break;
 						}
 						
-                                                memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
-                                                bits = convertToBits(dmrPacket); //convert it to bits
+						memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+						bits = convertToBits(dmrPacket); //convert it to bits
 
-                                                if (slotType[slot] == 0x4444){  //Data header
+						if (slotType[slot] == 0x4444){  //Data header
 							callType[slot] = buffer[TYP_OFFSET1];
-                                                        repeaterList[repPos].sending[slot] = true;
-                                                        receivingData[slot] = true;
-                                                        dataBlocks[slot] = 0;
-                                                        headerDecode[slot] = decodeDataHeader(bits);
-                                                        syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
-                                                        break;
-                                                }
+							repeaterList[repPos].sending[slot] = true;
+							receivingData[slot] = true;
+							dataBlocks[slot] = 0;
+							headerDecode[slot] = decodeDataHeader(bits);
+							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
+							break;
+						}
 
 						if (slotType[slot] == 0x5555 && !receivingData[slot]){ // 1/2 rate data without valid header
 							block[slot] = true;
@@ -665,6 +718,10 @@ void *dmrListener(void *f){
 							logTraffic(srcId[slot],dstId[slot],slot,"Voice",callType[slot],repeaterList[repPos].callsign);
 							if (block[slot] == true){
 								releaseBlock[slot] = true;
+							}
+							if (repConnectNewState !=0 && slot ==2){
+								repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos);
+								repConnectNewState = 0;
 							}
 							if (reflectorNewState !=0 && slot ==2){
 								reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState,repeaterList[repPos].conference[2],repPos);
@@ -757,11 +814,14 @@ void *dmrListener(void *f){
 				if (dmrState[2] == VOICE){
 					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					logTraffic(srcId[2],dstId[2],slot,"Voice",callType[2],repeaterList[repPos].callsign);
-                                        if (reflectorNewState !=0 && slot ==2){
-                                        	reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState,repeaterList[repPos].conference[2],repPos);
-                                                reflectorNewState = 0;
-                                        }
-
+					if (repConnectNewState !=0 && slot ==2){
+						repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos);
+						repConnectNewState = 0;
+					}
+					if (reflectorNewState !=0 && slot ==2){
+						reflectorStatus(sockfd,repeaterList[repPos].address,reflectorNewState,repeaterList[repPos].conference[2],repPos);
+						reflectorNewState = 0;
+					}
 				}
 				if (receivingData[2]){
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
