@@ -68,6 +68,9 @@ struct header{
 
 void delRdacRepeater();
 void delRepeater();
+void sendTalkgroupInfo();
+void sendRepeaterInfo();
+void sendReflectorStatus();
 bool * convertToBits();
 struct header decodeDataHeader();
 unsigned char *  decodeThreeQuarterRate();
@@ -396,7 +399,8 @@ void *dmrListener(void *f){
 	int reflectorNewState = 0;
 	bool txStart;
 	int repConnectNewState = 0;
-	unsigned char reflectorState[50];
+	unsigned char reflectorState[200];
+	unsigned char ip[INET_ADDRSTRLEN];
 
 
 	unsigned char gpsStringHyt[4] = {0x08,0xD0,0x03,0x00};
@@ -437,8 +441,22 @@ void *dmrListener(void *f){
 	if(repeaterList[repPos].autoReflector != 0){
 		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
 		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
+		updateRepeaterStatus(repeaterList[repPos].callsign,1);
+	
+		//If autoreflector is intl, send needed info to sMaster
+		for(l=0;l<numReflectors;l++){
+			if(localReflectors[l].id == repeaterList[repPos].autoReflector){
+				repeaterList[repPos].conferenceType[2] = localReflectors[l].type;
+				if(localReflectors[l].type == 1){
+					if(sMaster.online){
+						sendRepeaterInfo(sMaster.sockfd,sMaster.address,repPos);
+						sendReflectorStatus(sMaster.sockfd,sMaster.address,repPos);
+						sendTalkgroupInfo(sMaster.sockfd,sMaster.address,repeaterList[repPos].conference[2]);
+					}
+				}
+			}
+		}
 	}
-	updateRepeaterStatus(repeaterList[repPos].callsign,1);
 	for (;;){
 		FD_SET(sockfd, &fdMaster);
 		timeout.tv_sec = 1;
@@ -487,7 +505,12 @@ void *dmrListener(void *f){
 							callType[slot] = buffer[TYP_OFFSET1];
 							repeaterList[repPos].sending[slot] = true;
 							if (sMaster.online){
-								sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
+								if (repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].conferenceType[2] ==1 && slot == 2 && dstId[slot] == 9){
+									sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,repeaterList[repPos].conference[2],srcId[slot],version,repeaterList[repPos].id,master.ownName);
+								}
+								else{
+									sprintf(webUserInfo,"RX_Slot=%i,GROUP=%i,USER_ID=%i,TYPE=Voice,VERS=%s,RPTR=%i,%s\n",slot,dstId[slot],srcId[slot],version,repeaterList[repPos].id,master.ownName);
+								}
 								sendto(sMaster.sockfd,webUserInfo,strlen(webUserInfo),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 							}
 							if ((dstId[slot] == echoId && slot == echoSlot) || (dstId[slot] == 9 && srcId[slot] == 4000)){
@@ -509,14 +532,13 @@ void *dmrListener(void *f){
 								if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 								if(repeaterList[repPos].conferenceType[2] ==1){
 									if(sMaster.online){
-										sprintf(reflectorState,"%6.6s@%6.6s@%4.4i\n",repeaterList[repPos].callsign,repeaterList[repPos].id,repeaterList[repPos].conference[2]);
-										sendto(sMaster.sockfd,reflectorState,strlen(reflectorState),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+										sendRepeaterInfo(sMaster.sockfd,sMaster.address,repPos);
 									}
 								}
 							}
 							if(dstId[2] > 4000 && dstId[2] < 5000){
 								for(l=0;l<numReflectors;l++){
-									if(localReflectors[l].id = dstId[2]){
+									if(localReflectors[l].id == dstId[2]){
 										repeaterList[repPos].conference[2] = dstId[2];
 										repeaterList[repPos].conferenceType[2] = localReflectors[l].type;
 										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s type %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name,localReflectors[l].type);
@@ -525,8 +547,9 @@ void *dmrListener(void *f){
 										if(repeaterList[repPos].autoReflector !=0) time(&autoReconnectTimer);
 										if (localReflectors[l].type == 1){
 											if(sMaster.online){
-												sprintf(reflectorState,"%6.6s@%6.6s@%4.4i\n",repeaterList[repPos].callsign,repeaterList[repPos].id,repeaterList[repPos].conference[2]);
-												sendto(sMaster.sockfd,reflectorState,strlen(reflectorState),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+												sendRepeaterInfo(sMaster.sockfd,sMaster.address,repPos);
+												sendReflectorStatus(sMaster.sockfd,sMaster.address,repPos);
+												sendTalkgroupInfo(sMaster.sockfd,sMaster.address);
 											}
 										}
 										break;
@@ -590,7 +613,6 @@ void *dmrListener(void *f){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to conference %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 									time(&reflectorTimeout);
 									if (autoReconnectTimer !=0) time(&autoReconnectTimer);
-									if (repeaterList[repPos].conferenceType[2] == 1) toSend.sMaster = true;
 								}
 								else if(repeaterList[repPos].pearRepeater[2] != 0 && slot == 2 && dstId[2] == 9){
 									syslog(LOG_NOTICE,"[%s]Voice call started, sending to repeater %i",repeaterList[repPos].callsign,repeaterList[repPos].pearRepeater[2]);
@@ -730,16 +752,24 @@ void *dmrListener(void *f){
 						}
 						break;
 					}
+					
 					if (repeaterList[repPos].pearRepeater[2] != 0){
 						sendto(repeaterList[repeaterList[repPos].pearPos[2]].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[repeaterList[repPos].pearPos[2]].address,sizeof(repeaterList[repeaterList[repPos].pearPos[2]].address));
 					}
-					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9){
+					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9 && repeaterList[repPos].conferenceType[2] == 0){
 						for (i=0;i<highestRepeater;i++){
 							if (repeaterList[i].conference[2] == repeaterList[repPos].conference[2] && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr){
 								sendto(repeaterList[i].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 							}
 						}
 					}
+					else if (repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].conferenceType[2] == 1 && sMaster.online && slot == 2 && dstId[2] == 9){
+							memcpy(buffer+64,(char*)&repeaterList[repPos].conference[2],sizeof(int));
+							memcpy(sMasterFrame,buffer,n);
+							memcpy(sMasterFrame + n,myId,11);
+							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+					}
+
 					if (!block[slot]){
 						if (toSend.sMaster && sMaster.online){
 							if (txStart){
@@ -856,12 +886,14 @@ void *dmrListener(void *f){
 				syslog(LOG_NOTICE,"[%s]Remove repeater from conference %i after conference timeout",repeaterList[repPos].callsign,repeaterList[repPos].conference[2]);
 				repeaterList[repPos].conference[2] = 0;
 				reflectorStatus(sockfd,repeaterList[repPos].address,1,repeaterList[repPos].conference[2],repPos);
+				//if intl send to sMaster
 			}
 			if (difftime(timeNow,autoReconnectTimer) > 600 && autoReconnectTimer != 0){
 				syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i due to auto reconnect timer",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
 				repeaterList[repPos].conference[2] = repeaterList[repPos].autoReflector;
 				reflectorStatus(sockfd,repeaterList[repPos].address,2,repeaterList[repPos].conference[2],repPos);
 				autoReconnectTimer = 0;
+				//if intl send to sMaster
 			}
 		}
 	}

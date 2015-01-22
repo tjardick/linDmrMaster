@@ -23,15 +23,15 @@ void sendAprsBeacon();
 sqlite3 *openDatabase();
 void closeDatabase();
 void updateRepeaterTable();
+void sendReflectorStatus();
 
 void *scheduler(){
 	time_t timeNow,beaconTime=0,dataBaseCleanTime,dmrCleanUpTime;
-	int i, id;
+	int i, id, l;
 	char SQLQUERY[200];
 	sqlite3 *dbase;
 	sqlite3_stmt *stmt;
 	bool sending = false;
-	unsigned char refStatus[50];
 
 	syslog(LOG_NOTICE,"Scheduler thread started");
 	time(&beaconTime);
@@ -43,12 +43,7 @@ void *scheduler(){
 
 		//Send to sMaster if intl reflector is connected
 		if (sMaster.online){
-			for(i=0;i<highestRepeater;i++){
-				if (repeaterList[i].id != 0 && repeaterList[i].dmrOnline && repeaterList[i].conference[2] !=0 && repeaterList[i].conferenceType[2] == 1){
-					sprintf(refStatus,"%6.6s@%6.6s@%4.4i\n",repeaterList[i].callsign,repeaterList[i].id,repeaterList[i].conference[2]);
-					sendto(sMaster.sockfd,refStatus,strlen(refStatus),0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
-				}
-			}
+			sendReflectorStatus(sMaster.sockfd,sMaster.address,100);
 		}
 
 		//Send APRS beacons
@@ -108,6 +103,21 @@ void *scheduler(){
 							if (repeaterList[i].pearRepeater[2] != 0){
 								repeaterList[i].pearRepeater[2] = 0;
 								repeaterList[repeaterList[i].pearPos[2]].pearRepeater[2] = 0;
+							}
+							if (repeaterList[i].conference[2] !=0){
+								//If autoreflector is intl, send needed info to sMaster
+								for(l=0;l<numReflectors;l++){
+									if(localReflectors[l].id == repeaterList[i].conference[2]){
+										repeaterList[i].conferenceType[2] = localReflectors[l].type;
+										if(localReflectors[l].type == 1){
+											if(sMaster.online){
+												sendRepeaterInfo(sMaster.sockfd,sMaster.address,i);
+												sendReflectorStatus(sMaster.sockfd,sMaster.address,i);
+												sendTalkgroupInfo(sMaster.sockfd,sMaster.address,repeaterList[i].conference[2]);
+											}
+										}
+									}
+								}
 							}
 						}
 					}

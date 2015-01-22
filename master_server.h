@@ -95,8 +95,8 @@ struct masterInfo{
 	char ownRegion[2];
 	char sMasterIp[100];
 	char sMasterPort[6];
-	char announcedCC1[80];
-	char announcedCC2[80];
+	char announcedCC1[90];
+	char announcedCC2[90];
 	int ownCCInt;
 	int ownRegionInt;
 	int sMasterTS1GroupCount;
@@ -168,3 +168,4 @@ extern char aprsUrl[100];
 extern char aprsPort[7];
 extern int aprsSockFd;
 extern int numReflectors;
+extern int masterDmrId;
