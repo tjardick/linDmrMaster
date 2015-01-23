@@ -887,6 +887,12 @@ void *dmrListener(void *f){
 				repeaterList[repPos].conference[2] = 0;
 				reflectorStatus(sockfd,repeaterList[repPos].address,1,repeaterList[repPos].conference[2],repPos);
 				//if intl send to sMaster
+				if (localReflectors[l].type == 1){
+					if(sMaster.online){
+						sendRepeaterInfo(sMaster.sockfd,sMaster.address,repPos);
+					}
+				}
+
 			}
 			if (difftime(timeNow,autoReconnectTimer) > 600 && autoReconnectTimer != 0){
 				syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i due to auto reconnect timer",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
@@ -894,6 +900,18 @@ void *dmrListener(void *f){
 				reflectorStatus(sockfd,repeaterList[repPos].address,2,repeaterList[repPos].conference[2],repPos);
 				autoReconnectTimer = 0;
 				//if intl send to sMaster
+				for(l=0;l<numReflectors;l++){
+					if(localReflectors[l].id == repeaterList[repPos].autoReflector){
+						repeaterList[repPos].conferenceType[2] = localReflectors[l].type;
+						if(localReflectors[l].type == 1){
+							if(sMaster.online){
+								sendRepeaterInfo(sMaster.sockfd,sMaster.address,repPos);
+								sendReflectorStatus(sMaster.sockfd,sMaster.address,repPos);
+								sendTalkgroupInfo(sMaster.sockfd,sMaster.address,repeaterList[repPos].conference[2]);
+							}
+						}
+					}
+				}
 			}
 		}
 	}
