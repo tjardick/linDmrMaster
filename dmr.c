@@ -756,18 +756,18 @@ void *dmrListener(void *f){
 					if (repeaterList[repPos].pearRepeater[2] != 0){
 						sendto(repeaterList[repeaterList[repPos].pearPos[2]].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[repeaterList[repPos].pearPos[2]].address,sizeof(repeaterList[repeaterList[repPos].pearPos[2]].address));
 					}
-					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9 && repeaterList[repPos].conferenceType[2] == 0){
+					if (repeaterList[repPos].conference[2] !=0 && slot == 2 && dstId[2] == 9){
 						for (i=0;i<highestRepeater;i++){
 							if (repeaterList[i].conference[2] == repeaterList[repPos].conference[2] && repeaterList[i].address.sin_addr.s_addr != cliaddrOrg.sin_addr.s_addr){
 								sendto(repeaterList[i].sockfd,buffer,n,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 							}
 						}
-					}
-					else if (repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].conferenceType[2] == 1 && sMaster.online && slot == 2 && dstId[2] == 9){
+						if (repeaterList[repPos].conferenceType[2] == 1 && sMaster.online){
 							memcpy(buffer+64,(char*)&repeaterList[repPos].conference[2],sizeof(int));
 							memcpy(sMasterFrame,buffer,n);
 							memcpy(sMasterFrame + n,myId,11);
 							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
+						}
 					}
 
 					if (!block[slot]){
