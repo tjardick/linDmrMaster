@@ -423,8 +423,8 @@ int getMasterInfo(){
 		closeDatabase(db);
 		return 0;
 	}
-	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i echoSlot %i rrsGpsId %i",
-	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,echoSlot,rrsGpsId);
+	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i echoSlot %i rrsGpsId %i software_ID %i",
+	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,echoSlot,rrsGpsId,masterDmrId);
 	syslog(LOG_NOTICE,"Assigning APRS server %s port %s",aprsUrl,aprsPort);
 	if (maxRepeaters > 98){
 		syslog(LOG_NOTICE,"maxRepeaters exceeded 98, quiting application");
@@ -449,7 +449,7 @@ void getLocalReflectors(){
                         localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
                         sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
 						localReflectors[numReflectors].type = sqlite3_column_int(stmt,2);
-			syslog(LOG_NOTICE,"Added reflector %i %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name);
+			syslog(LOG_NOTICE,"Added reflector %i %s type %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name,localReflectors[numReflectors].type == 1 ? "intl":"local");
 			numReflectors++;
                 }
         }
