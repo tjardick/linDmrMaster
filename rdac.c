@@ -54,6 +54,7 @@ void delRdacRepeater(struct sockaddr_in address){
 			rdacList[i].rdacOnline = false;
 			rdacList[i].rdacUpdated = false;
 			rdacList[i].dmrOnline = false;
+			rdacList[i].intlRefAllow = false;
 			rdacList[i].rdacUpdateAttempts = 0;
 			rdacList[i].id = 0;
 			rdacList[i].conference[1] = 0;
@@ -113,7 +114,7 @@ int setRdacRepeater(struct sockaddr_in address){
 	inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
 	//See if there is already info in the database based on IP address
 	db = openDatabase();
-	sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector FROM repeaters WHERE ipAddress = '%s'",str);
+	sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector,intlRefAllow FROM repeaters WHERE ipAddress = '%s'",str);
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			rdacList[i].id = sqlite3_column_int(stmt,0);
@@ -129,6 +130,7 @@ int setRdacRepeater(struct sockaddr_in address){
 			sprintf(rdacList[i].aprsBeacon,"%s",sqlite3_column_text(stmt,10));
 			sprintf(rdacList[i].aprsPHG,"%s",sqlite3_column_text(stmt,11));
 			rdacList[i].autoReflector = sqlite3_column_int(stmt,12);
+			rdacList[i].intlRefAllow = (sqlite3_column_int(stmt,13) == 1 ? true:false);
 			syslog(LOG_NOTICE,"Assigning %s %s %s %s %s %s %s to repeater on pos %i from database [%s]",rdacList[i].callsign,rdacList[i].hardware
 			,rdacList[i].firmware,rdacList[i].mode,rdacList[i].txFreq,rdacList[i].shift,rdacList[i].language,i,str);
 			sqlite3_finalize(stmt);

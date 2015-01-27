@@ -29,7 +29,7 @@ int echoId = 9990;
 int echoSlot = 1;
 int rrsGpsId = 500;
 char version[5] = "3.0";
-int masterDmrId = 206390;
+int masterDmrId = 0;
 
 struct repeater repeaterList[100] = {0};
 struct repeater emptyRepeater = {0};
@@ -119,6 +119,7 @@ int initRepeater(struct repeater repeaterInfo){
 	repeaterList[i].conference[1] = 0;
 	repeaterList[i].conference[2] = repeaterInfo.autoReflector;
 	repeaterList[i].autoReflector = repeaterInfo.autoReflector;
+	repeaterList[i].intlRefAllow = repeaterInfo.intlRefAllow;
 	repeaterList[i].pearRepeater[1] = 0;
 	repeaterList[i].pearRepeater[2] = 0;
 	repeaterList[i].pearPos[1] = 0;
@@ -160,6 +161,7 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].rdacOnline = false;
                         repeaterList[i].rdacUpdated = false;
                         repeaterList[i].dmrOnline = false;
+						repeaterList[i].intlRefAllow = false;
                         repeaterList[i].rdacUpdateAttempts = 0;
                         repeaterList[i].id = 0;
                         repeaterList[i].upDated = 0;
@@ -393,7 +395,7 @@ int getMasterInfo(){
     syslog(LOG_NOTICE,"sMaster info: ownName %s, ownCountryCode %s, ownRegion %s, sMasterIp %s, sMasterPort %s",
 	master.ownName,master.ownCountryCode,master.ownRegion,master.sMasterIp,master.sMasterPort);
 	
-	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseRdacPort FROM master");
+	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseRdacPort,masterDmrId FROM master");
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			servicePort = sqlite3_column_int(stmt,0);
@@ -407,6 +409,7 @@ int getMasterInfo(){
 			sprintf(aprsPort,"%s",sqlite3_column_text(stmt,8));
 			echoSlot = sqlite3_column_int(stmt,9);
 			baseRdacPort = sqlite3_column_int(stmt,10);
+			masterDmrId = sqlite3_column_int(stmt,11);
 		}
 		else{
 			syslog(LOG_NOTICE,"failed to read masterInfo, no row");

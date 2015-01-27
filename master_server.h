@@ -44,6 +44,7 @@ struct repeater{
 	bool dmrOnline;
 	bool rdacOnline;
 	bool rdacUpdated;
+	bool intlRefAllow;
 	int rdacUpdateAttempts;
 	bool sending[3];
 	int conference[3];

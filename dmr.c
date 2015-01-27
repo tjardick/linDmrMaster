@@ -146,12 +146,12 @@ void updateRepeaterTable(int status, int reflector, int repPos){
 	else{
 		sprintf(SQLQUERY,"UPDATE repeaters set currentReflector = 0 where callsign = '%s'",repeaterList[repPos].callsign);
 	}
-        dbase = openDatabase();
+	dbase = openDatabase();
 	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
                 syslog(LOG_NOTICE,"Failed to update repeater table: %s",sqlite3_errmsg(dbase));
                 syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
         }
-        closeDatabase(dbase);
+	closeDatabase(dbase);
 }
 
 void playVoice(int sockfd, struct sockaddr_in address, char fileName[100],int repPos){
@@ -178,13 +178,22 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int refle
 
 	char fileName[100];
 
-	if(status ==2){
-	        sprintf(fileName,"connected.voice");
+	switch (status) {
+		case 1:
+		sprintf(fileName,"disconnected.voice");
+		updateRepeaterTable(status,reflector,repPos);
+		break;
+
+		case 2:
+		sprintf(fileName,"connected.voice");
+		updateRepeaterTable(status,reflector,repPos);
+		break;
+
+		case 3:
+		sprintf(fileName,"intl_not_allowed.voice");
+		break;
 	}
-	else{
-	        sprintf(fileName,"disconnected.voice");
-	}
-	updateRepeaterTable(status,reflector,repPos);
+	
 	playVoice(sockfd,address,fileName,repPos);	
 }
 
@@ -539,6 +548,11 @@ void *dmrListener(void *f){
 							if(dstId[2] > 4000 && dstId[2] < 5000){
 								for(l=0;l<numReflectors;l++){
 									if(localReflectors[l].id == dstId[2]){
+										if (localReflectors[l].type == 1 && !repeaterList[repPos].intlRefAllow){
+											syslog(LOG_NOTICE,"[%s]Not allowed to connect to intl reflector on this repeater %i",repeaterList[repPos].callsign,localReflectors[l].id);
+											reflectorNewState = 3;
+											break;
+										}
 										repeaterList[repPos].conference[2] = dstId[2];
 										repeaterList[repPos].conferenceType[2] = localReflectors[l].type;
 										syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i %s type %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name,localReflectors[l].type);
