@@ -432,9 +432,9 @@ void *dmrListener(void *f){
 	//create frame to append after packet for sMaster
 	memset(sMasterFrame,0,103);
 	memcpy(myId,(char*)&repeaterList[repPos].id,sizeof(int));
-	memcpy(myId+4,master.ownCountryCode,4);
-	memcpy(myId+7,master.ownRegion,1);
-	memcpy(myId+8,version,3);
+	//memcpy(myId+4,master.ownCountryCode,4);
+	//memcpy(myId+7,master.ownRegion,1);
+	//memcpy(myId+8,version,3);
 	memset(decodedString,0,300);
 
 	bzero(&servaddr,sizeof(servaddr));
@@ -508,7 +508,7 @@ void *dmrListener(void *f){
 						if (slotType[slot] == 0xeeee && frameType[slot] == 0x1111 && dmrState[slot] != VOICE && block[slot] == false){ //Hytera voice sync packet
 							//Sync packet is send before Voice LC header and every time the embedded LC (4 packets) in a voice superframe has been send
 							//When voice call starts, this is the first packet where we can see src and dst)
-							sMasterFrame[98] = slot;
+							//sMasterFrame[98] = slot;
 							srcId[slot] = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
 							dstId[slot] = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 							callType[slot] = buffer[TYP_OFFSET1];
@@ -780,6 +780,7 @@ void *dmrListener(void *f){
 							memcpy(buffer+64,(char*)&repeaterList[repPos].conference[2],sizeof(int));
 							memcpy(sMasterFrame,buffer,n);
 							memcpy(sMasterFrame + n,myId,11);
+							sMasterFrame[0] = 'R';
 							sendto(sMaster.sockfd,sMasterFrame,103,0,(struct sockaddr *)&sMaster.address,sizeof(sMaster.address));
 						}
 					}

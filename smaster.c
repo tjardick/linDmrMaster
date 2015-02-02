@@ -110,7 +110,7 @@ void sendRepeaterInfo(int sockfd,struct sockaddr_in servaddr,int repPos){
 				else{
 					sprintf(conference,"0");
 				}
-				sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     %-6s%-10s%-12s%-3s%i",i,ip,repeaterList[i].id,baseDmrPort+i,
+				sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     %-6s%-10s%-12s%-3s%i\n",i,ip,repeaterList[i].id,baseDmrPort+i,
 				master.ownCCInt,master.ownRegionInt,version,repeaterList[i].callsign,repeaterList[i].txFreq,repeaterList[i].shift,conference,
 				repeaterList[i].hardware,repeaterList[i].firmware,repeaterList[i].mode,masterDmrId);
 				sendto(sockfd,repInfo,strlen(repInfo),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
