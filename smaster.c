@@ -172,6 +172,7 @@ void *sMasterThread(){
 	struct sockaddr_in servaddr,cliaddr;
 	struct allow toSend = {0};
 	bool block[3];
+	bool reflectorTraffic = false;
 	
 	syslog(LOG_NOTICE,"Starting sMaster thread");
 	block[1] = false;
@@ -219,77 +220,76 @@ void *sMasterThread(){
 			}
 			else{
 				slot = buffer[SLOT_OFFSET1] / 16;
-				if (dmrState[slot] == IDLE || sMaster.sending[slot]){
-					packetType = buffer[PTYPE_OFFSET];
-					sync = buffer[SYNC_OFFSET1] << 8 | buffer[SYNC_OFFSET2];
-					switch (packetType){
-				
-						case 0x01:
-						if (sync == VCALL && dmrState[slot] != VOICE && block[slot] == false){
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
-							for (i=0;i<highestRepeater;i++){
-								if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
-									syslog(LOG_NOTICE,"[sMaster]Voice call started on slot %i src %i dst %i type %i from reflector",slot,srcId,dstId,callType);
-									sMaster.sending[slot] = true;
-									dmrState[slot] = VOICE;
-									break;
-								}
-							}
-							toSend = checkTalkGroup(dstId,slot,callType);
-							if (toSend.repeater == false){
-								block[slot] = true;
-								break;
-							}
-							sMaster.sending[slot] = true;
-							dmrState[slot] = VOICE;
-							syslog(LOG_NOTICE,"[sMaster]Voice call started on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
-							if (buffer[90] !=0) {
-								memcpy(origC[slot],buffer+90,4);
-								syslog(LOG_NOTICE,"[sMaster]Replacing country code to %s",origC[slot]);
-							} 
-							else{ 
-								memcpy(origC[slot],buffer+64,4);
-							}
-							break;
-						}
-						if (sync == DCALL && dmrState[slot] != DATA){
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
-							syslog(LOG_NOTICE,"[sMaster]Data on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
-							break;
-						}
-						break;
-				
-						case 0x03:
-						if (sync == VCALLEND){
-							dmrState[slot] = IDLE;
-							sMaster.sending[slot] = false;
-							block[slot] = false;
-							syslog(LOG_NOTICE,"[sMaster]Voice call ended on slot %i",slot);
-						}
-						break;
+				if (buffer[0] == 'R'){
+					if (!reflectorTraffic){
+						syslog(LOG_NOTICE,"Incoming traffic from reflector %i",dstId);
+						reflectorTraffic = true;
 					}
-					memcpy(buffer+64,origC[slot],4);
-					if (!block[slot]){
-						for (i=0;i<highestRepeater;i++){
-							if (repeaterList[i].address.sin_addr.s_addr !=0 && !repeaterList[i].sending[slot]){
-								sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
-							}
-						}
-					}
-					else{
-						for (i=0;i<highestRepeater;i++){
-							if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
-								sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
-							}
+					dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+					for (i=0;i<highestRepeater;i++){
+						if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
+							sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 						}
 					}
 				}
 				else{
-					syslog(LOG_NOTICE,"[sMaster]Incomming traffic on slot %i, but DMR not IDLE",slot);
+					if (dmrState[slot] == IDLE || sMaster.sending[slot]){
+						packetType = buffer[PTYPE_OFFSET];
+						sync = buffer[SYNC_OFFSET1] << 8 | buffer[SYNC_OFFSET2];
+						switch (packetType){
+				
+							case 0x01:
+							if (sync == VCALL && dmrState[slot] != VOICE && block[slot] == false){
+								srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+								dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+								callType = buffer[TYP_OFFSET1];
+								toSend = checkTalkGroup(dstId,slot,callType);
+								if (toSend.repeater == false){
+									block[slot] = true;
+									break;
+								}
+								sMaster.sending[slot] = true;
+								dmrState[slot] = VOICE;
+								syslog(LOG_NOTICE,"[sMaster]Voice call started on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
+								if (buffer[90] !=0) {
+									memcpy(origC[slot],buffer+90,4);
+									syslog(LOG_NOTICE,"[sMaster]Replacing country code to %s",origC[slot]);
+								} 
+								else{ 
+									memcpy(origC[slot],buffer+64,4);
+								}
+								break;
+							}
+							if (sync == DCALL && dmrState[slot] != DATA){
+								srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+								dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+								callType = buffer[TYP_OFFSET1];
+								syslog(LOG_NOTICE,"[sMaster]Data on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
+								break;
+							}
+							break;
+				
+							case 0x03:
+							if (sync == VCALLEND){
+								dmrState[slot] = IDLE;
+								sMaster.sending[slot] = false;
+								block[slot] = false;
+								syslog(LOG_NOTICE,"[sMaster]Voice call ended on slot %i",slot);
+							}
+							break;
+						}
+						memcpy(buffer+64,origC[slot],4);
+						if (!block[slot]){
+							for (i=0;i<highestRepeater;i++){
+								if (repeaterList[i].address.sin_addr.s_addr !=0 && !repeaterList[i].sending[slot]){
+									sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+								}
+							}
+						}
+					}
+					else{
+						syslog(LOG_NOTICE,"[sMaster]Incomming traffic on slot %i, but DMR not IDLE",slot);
+					}
 				}
 			}
 		}
@@ -307,6 +307,7 @@ void *sMasterThread(){
 				block[2] = false;
 				syslog(LOG_NOTICE,"[sMaster]Slot 2 IDLE");
 			}
+			if (reflectorTraffic) reflectorTraffic = false;
 			if (difftime(timeNow,needPingTime) > 5){
 				time(&needPingTime);
 				sendto(sockfd,ping,strlen(ping),0,(struct sockaddr *)&servaddr,sizeof(servaddr));

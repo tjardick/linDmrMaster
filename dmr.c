@@ -447,10 +447,10 @@ void *dmrListener(void *f){
 	len = sizeof(cliaddr);
 
 	autoReconnectTimer = 0;
+	updateRepeaterStatus(repeaterList[repPos].callsign,1);
 	if(repeaterList[repPos].autoReflector != 0){
 		updateRepeaterTable(2,repeaterList[repPos].autoReflector,repPos);
 		syslog(LOG_NOTICE,"[%s]Adding repeater to conference %i by auto reflector",repeaterList[repPos].callsign,repeaterList[repPos].autoReflector);
-		updateRepeaterStatus(repeaterList[repPos].callsign,1);
 	
 		//If autoreflector is intl, send needed info to sMaster
 		for(l=0;l<numReflectors;l++){
