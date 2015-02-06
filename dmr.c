@@ -882,10 +882,20 @@ void *dmrListener(void *f){
 				syslog(LOG_NOTICE,"[%s]Slot 2 IDLE",repeaterList[repPos].callsign);
 			}
 			if (difftime(timeNow,pingTime) > 60 && !repeaterList[repPos].sending[slot]){
-				syslog(LOG_NOTICE,"PING timeout on DMR port %i repeater %s, exiting thread",baseDmrPort + repPos,repeaterList[repPos].callsign);
-				syslog(LOG_NOTICE,"Removing repeater from list position %i",repPos);
-				updateRepeaterTable(1,repeaterList[repPos].autoReflector,repPos);
-				updateRepeaterStatus(repeaterList[repPos].callsign,0);
+				syslog(LOG_NOTICE,"[%s]PING timeout on DMR port %i, exiting thread",repeaterList[repPos].callsign,baseDmrPort + repPos);
+				syslog(LOG_NOTICE,"[%s]Removing repeater from list position %i",repeaterList[repPos].callsign,repPos);
+				bool found = false; 
+				for(i=0;i<highestRepeater;i++){
+					if (repeaterList[repPos].id == repeaterList[i].id){
+						syslog(LOG_NOTICE,"[%s]Repeater online in other thread, keep online in database",repeaterList[repPos].callsign);
+						found = true;
+					}
+				}
+				if (!found){
+					updateRepeaterTable(1,repeaterList[repPos].autoReflector,repPos);
+					updateRepeaterStatus(repeaterList[repPos].callsign,0);
+					found = false;
+				}
 				delRepeater(cliaddrOrg);
 				if (repPos + 1 == highestRepeater) highestRepeater--;
 				delRdacRepeater(cliaddrOrg);

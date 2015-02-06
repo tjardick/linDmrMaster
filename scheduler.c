@@ -78,7 +78,7 @@ void *scheduler(){
 			}
 				
 			id = 0;
-			sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector FROM repeaters WHERE upDated = 1");
+			sprintf(SQLQUERY,"SELECT repeaterId,callsign,txFreq,shift,hardware,firmware,mode,language,geoLocation,aprsPass,aprsBeacon,aprsPHG,autoReflector,intlRefAllow FROM repeaters WHERE upDated = 1");
 			if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
 				while (sqlite3_step(stmt) == SQLITE_ROW){
 					id = sqlite3_column_int(stmt,0);
@@ -96,6 +96,7 @@ void *scheduler(){
 							sprintf(repeaterList[i].aprsBeacon,"%s",sqlite3_column_text(stmt,10));
 							sprintf(repeaterList[i].aprsPHG,"%s",sqlite3_column_text(stmt,11));
 							repeaterList[i].autoReflector = sqlite3_column_int(stmt,12);
+							repeaterList[i].intlRefAllow = (sqlite3_column_int(stmt,13) == 1 ? true:false);
 							syslog(LOG_NOTICE,"Repeater data changed from web %s %s %s %s %s %s %s %s %s %s %s %i on pos %i",repeaterList[i].callsign,repeaterList[i].hardware
 							,repeaterList[i].firmware,repeaterList[i].mode,repeaterList[i].txFreq,repeaterList[i].shift,repeaterList[i].language
 							,repeaterList[i].geoLocation,repeaterList[i].aprsPass,repeaterList[i].aprsBeacon,repeaterList[i].aprsPHG,repeaterList[i].autoReflector,i);

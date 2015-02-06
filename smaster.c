@@ -222,7 +222,7 @@ void *sMasterThread(){
 				slot = buffer[SLOT_OFFSET1] / 16;
 				if (buffer[0] == 'R'){
 					if (!reflectorTraffic){
-						syslog(LOG_NOTICE,"Incoming traffic from reflector %i",dstId);
+						syslog(LOG_NOTICE,"[sMaster]Incoming traffic from reflector %i",dstId);
 						reflectorTraffic = true;
 					}
 					dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
@@ -307,7 +307,11 @@ void *sMasterThread(){
 				block[2] = false;
 				syslog(LOG_NOTICE,"[sMaster]Slot 2 IDLE");
 			}
-			if (reflectorTraffic) reflectorTraffic = false;
+			if (reflectorTraffic){
+				reflectorTraffic = false;
+				syslog(LOG_NOTICE,"[sMaster] Voice call ended on reflector");
+			}	
+			
 			if (difftime(timeNow,needPingTime) > 5){
 				time(&needPingTime);
 				sendto(sockfd,ping,strlen(ping),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
