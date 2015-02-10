@@ -197,7 +197,7 @@ void serviceListener(port){
 	socklen_t len;
 	unsigned char buffer[500];
 	unsigned char response[500] ={0};
-	unsigned char command[] = {0x50,0x32,0x50,0x50};
+	unsigned char command[] = {0x50,0x32,0x50};
 	unsigned char ping[] = {0x0a,0x00,0x00,0x00,0x14};
 	char str[INET_ADDRSTRLEN];
 	int redirectPort;

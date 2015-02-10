@@ -200,6 +200,15 @@ int initDatabase(sqlite3 *db){
 			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
 			return 0;
 		}
+		sprintf(SQLQUERY,"INSERT INTO access (userName,password,role) VALUES ('admin','admin','admin')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Default admin user created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+		
 	}
 	
 	//check for new fields added later in development
