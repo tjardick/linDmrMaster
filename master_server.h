@@ -170,3 +170,4 @@ extern char aprsPort[7];
 extern int aprsSockFd;
 extern int numReflectors;
 extern int masterDmrId;
+extern int debug;

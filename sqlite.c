@@ -246,6 +246,18 @@ int initDatabase(sqlite3 *db){
                         return 0;
                 }
         }
+
+        if (!isFieldExisting(db,"master","debug")){
+                sprintf(SQLQUERY,"alter table master add debug integer default 0");
+                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+                        syslog(LOG_NOTICE,"field debug in master created");
+                }
+                else{
+                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+                        return 0;
+                }
+        }
+
 		
 	//Clean database
 	sprintf(SQLQUERY,"update repeaters set currentReflector = 0");

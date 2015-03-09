@@ -30,6 +30,7 @@ int echoSlot = 1;
 int rrsGpsId = 500;
 char version[5] = "3.0";
 int masterDmrId = 0;
+int debug = false;
 
 struct repeater repeaterList[100] = {0};
 struct repeater emptyRepeater = {0};

@@ -132,6 +132,14 @@ void *scheduler(){
 					syslog(LOG_NOTICE,"Failed to reset 'updated' in repeater table: %s",sqlite3_errmsg(dbase));
 				}
 			}
+			
+			sprintf(SQLQUERY,"Select debug FROM master");
+			if (sqlite3_prepare_v2(dbase,SQLQUERY,-1,&stmt,0) == 0){
+				while (sqlite3_step(stmt) == SQLITE_ROW){
+					debug = sqlite3_column_int(stmt,0);
+				}
+				sqlite3_finalize(stmt);
+			}
 			closeDatabase(dbase);
 			time(&dataBaseCleanTime);
 		}

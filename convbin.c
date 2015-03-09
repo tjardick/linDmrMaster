@@ -17,9 +17,6 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-/*Source code inspired on the work of Paul Griffiths
-  www.paulgriffiths.net
-*/
 
 #include "master_server.h"
 
@@ -34,12 +31,10 @@ bool * convertToBits(unsigned char packet[34]){
 	for (i=0;i<32;i=i+2){
 		convPacket[i] = *(packet + i + 1);
 		convPacket[i+1] = *(packet +i);
-		//sprintf(dmrPacket,"%s%02x:%02x:",dmrPacket,convPacket[i],convPacket[i+1]);
-		//printf("i = %i\n",i);
+		if (debug ==1) sprintf(dmrPacket,"%s%02x:%02x:",dmrPacket,convPacket[i],convPacket[i+1]);
 	}
 	convPacket[32] = *(packet + 33);
-	//syslog(LOG_NOTICE,"DMR packet:%s",dmrPacket);
-	//printf("=====================\n");
+	if (debug ==1) syslog(LOG_NOTICE,"[convertToBits]DMR packet:%s",dmrPacket);
 	//convert to bits
 	for (i=0;i<33;i++){
 		for(x=0;x<8;x++){

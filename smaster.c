@@ -220,12 +220,13 @@ void *sMasterThread(){
 			}
 			else{
 				slot = buffer[SLOT_OFFSET1] / 16;
+				dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+				srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
 				if (buffer[0] == 'R'){
 					if (!reflectorTraffic){
-						syslog(LOG_NOTICE,"[sMaster]Incoming traffic from reflector %i",dstId);
+						syslog(LOG_NOTICE,"[sMaster]Incoming traffic from reflector %i source id = %i",dstId,srcId);
 						reflectorTraffic = true;
 					}
-					dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
 					for (i=0;i<highestRepeater;i++){
 						if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
 							sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));

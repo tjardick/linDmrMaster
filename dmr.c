@@ -662,6 +662,7 @@ void *dmrListener(void *f){
 							repeaterList[repPos].sending[slot] = true;
 							receivingData[slot] = true;
 							dataBlocks[slot] = 0;
+							if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 							headerDecode[slot] = decodeDataHeader(bits);
 							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
 							break;
@@ -677,14 +678,15 @@ void *dmrListener(void *f){
 							break;
 						}
 						
-						memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
-						bits = convertToBits(dmrPacket); //convert it to bits
 
 						if (slotType[slot] == 0x4444){  //Data header
+							memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+							bits = convertToBits(dmrPacket); //convert it to bits
 							callType[slot] = buffer[TYP_OFFSET1];
 							repeaterList[repPos].sending[slot] = true;
 							receivingData[slot] = true;
 							dataBlocks[slot] = 0;
+							if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 							headerDecode[slot] = decodeDataHeader(bits);
 							syslog(LOG_NOTICE,"[%s]Data header on slot %i src %i dst %i type %i appendBlocks %i",repeaterList[repPos].callsign,slot,srcId[slot],dstId[slot],callType[slot],headerDecode[slot].appendBlocks);
 							break;
@@ -701,10 +703,13 @@ void *dmrListener(void *f){
 							break;
 						}
 						if (slotType[slot] == 0x5555 && receivingData[slot]){ // 1/2 rate data continuation
+							memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+							bits = convertToBits(dmrPacket); //convert it to bits
 							decoded12[slot] = decodeHalfRate(bits);
 							memcpy(decodedString[slot]+(12*dataBlocks[slot]),decoded12[slot],12);
 							dataBlocks[slot]++;
 							if(headerDecode[slot].appendBlocks == dataBlocks[slot]){
+								if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 								receivingData[slot] = false;
 								releaseBlock[slot] = true;
 								dataBlocks[slot] = 0;
@@ -723,10 +728,13 @@ void *dmrListener(void *f){
 							break;
 						}
 						if (slotType[slot] == 0x6666 && receivingData[slot]){ // 3/4 rate data continuation
+							memcpy(dmrPacket,buffer+26,34);  //copy the dmr part out of the Hyetra packet
+							bits = convertToBits(dmrPacket); //convert it to bits
 							decoded34[slot] = decodeThreeQuarterRate(bits);
 							memcpy(decodedString[slot]+(18*dataBlocks[slot]),decoded34[slot],18);
 							dataBlocks[slot]++;
 							if(headerDecode[slot].appendBlocks +1 == dataBlocks[slot]){  //Hytera sends last datablock twice
+								if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 								releaseBlock[slot] = true;
 								receivingData[slot] = false;
 								dataBlocks[slot] = 0;
@@ -843,6 +851,7 @@ void *dmrListener(void *f){
 					logTraffic(srcId[1],dstId[1],slot,"Voice",callType[1],repeaterList[repPos].callsign);
 				}
 				if (receivingData[1]){
+					if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 1",repeaterList[repPos].callsign);
 					dataBlocks[1] = 0;
 					receivingData[1] = false;
@@ -869,6 +878,7 @@ void *dmrListener(void *f){
 					}
 				}
 				if (receivingData[2]){
+					if (debug == 1) syslog(LOG_NOTICE,"------------------------------------------------------------------------------------------");
 					syslog(LOG_NOTICE,"[%s]Data call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					dataBlocks[2] = 0;
 					receivingData[2] = false;
