@@ -235,7 +235,7 @@ void *sMasterThread(){
 				}
 				else{
 					if (dmrState[slot] == IDLE || sMaster.sending[slot]){
-						packetType = buffer[PTYPE_OFFSET];
+						packetType = buffer[PTYPE_OFFSET] && 0x0f;
 						sync = buffer[SYNC_OFFSET1] << 8 | buffer[SYNC_OFFSET2];
 						switch (packetType){
 				
