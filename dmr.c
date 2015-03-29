@@ -481,7 +481,7 @@ void *dmrListener(void *f){
 			if (n>2){
 				slot = buffer[SLOT_OFFSET1] / 16;
 				if (dmrState[slot] == IDLE || repeaterList[repPos].sending[slot]){
-					packetType[slot] = buffer[PTYPE_OFFSET];
+					packetType[slot] = buffer[PTYPE_OFFSET] & 0x0F;
 					slotType[slot] = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 					frameType[slot]  = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
 					switch (packetType[slot]){
