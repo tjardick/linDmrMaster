@@ -19,11 +19,93 @@
 
 #include "master_server.h"
 
+#define VFRAMESIZE 72
+#define SLOT_TYPE_OFFSET1 18
+#define SLOT_TYPE_OFFSET2 19
+#define FRAME_TYPE_OFFSET1 22
+#define FRAME_TYPE_OFFSET2 23
+#define PTYPE_OFFSET 8
+
 void sendAprsBeacon();
 sqlite3 *openDatabase();
 void closeDatabase();
 void updateRepeaterTable();
 void sendReflectorStatus();
+int repeater,oldStartPos = 0,startPos=0,oldFrames = 0,frames=0;
+char startFile[100];
+
+void playTestVoice(){
+	FILE *file;
+	char fileName[100] = "voiceTest";
+	char line[256];
+	char *param;
+	int i;
+	int slotType,packetType,frameType;
+	unsigned char buffer[VFRAMESIZE];
+	unsigned char endBuffer[VFRAMESIZE];
+	
+	if (file = fopen(fileName,"rb")){
+		fgets(line,sizeof(line),file);
+		fgets(line,sizeof(line),file);
+		param = strtok(line,";");
+		repeater = atoi(param);
+		param = strtok(line,NULL);
+		sprintf(startFile,"%s",param);
+		param = strtok(line,NULL);
+		startPos = atoi(param);	
+		param = strtok(line,NULL);
+		frames = atoi(param);
+		fclose(file);
+	}
+	else{
+		syslog(LOG_NOTICE,"[VoiceTest] Failed to open %s",fileName);
+		return;
+	}
+	if (startPos != oldStartPos || frames != oldFrames){
+		syslog(LOG_NOTICE,"[VoiceTest] parameters different, starting test");
+		oldStartPos = startPos;
+		oldFrames = frames;
+		if (file = fopen(startFile,"rb")){
+			while (fread(buffer,VFRAMESIZE,1,file)){
+				slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+				frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+				packetType = buffer[PTYPE_OFFSET] & 0x0F;
+				if (slotType != 0x2222 && packetType !=3){
+					sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+				}
+				else{
+					memcpy(endBuffer,buffer,VFRAMESIZE);
+				}
+				if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+			}
+			fclose(file);
+		}
+		else{
+			syslog(LOG_NOTICE,"[VoiceTest] Failed to open %s",startFile);
+		}
+		if (file = fopen("chunks.voice","rb")){
+			fseek(file,startPos * VFRAMESIZE,SEEK_SET);
+			for(i=0;i<frames;i++){
+				if (fread(buffer,VFRAMESIZE,1,file)){
+					slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+					frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+					packetType = buffer[PTYPE_OFFSET] & 0x0F;
+					if (slotType != 0x2222 && packetType !=3) sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+					if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+				}
+				else{
+					syslog(LOG_NOTICE,"[VoiceTest] fread failed from chunks.voice");
+				}
+			}
+			sendto(repeaterList[repeater].sockfd,endBuffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+			fclose(file);
+		}
+		else{
+			syslog(LOG_NOTICE,"[VoiceTest] Failed to open chunks.voice");
+		}
+	}
+
+}
 
 void *scheduler(){
 	time_t timeNow,beaconTime=0,dataBaseCleanTime,dmrCleanUpTime;

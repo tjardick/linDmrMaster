@@ -168,6 +168,7 @@ void *sMasterThread(){
 	int srcId = 0;
 	int dstId = 0;
 	int callType = 0;
+	int defTG2 = 9;
 	unsigned char origC[5][3];
 	struct sockaddr_in servaddr,cliaddr;
 	struct allow toSend = {0};
@@ -227,6 +228,10 @@ void *sMasterThread(){
 						syslog(LOG_NOTICE,"[sMaster]Incoming traffic from reflector %i source id = %i",dstId,srcId);
 						reflectorTraffic = true;
 					}
+					//changed here !!!
+					if (buffer[1] == 0x02) buffer[0] = 0x01; else buffer[0] = buffer[1];
+					memcpy(buffer+64,(char*)&defTG2,sizeof(int));
+					//end
 					for (i=0;i<highestRepeater;i++){
 						if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
 							sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
