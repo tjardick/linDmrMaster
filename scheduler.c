@@ -44,16 +44,16 @@ void playTestVoice(){
 	unsigned char buffer[VFRAMESIZE];
 	unsigned char endBuffer[VFRAMESIZE];
 	
-	if (file = fopen(fileName,"rb")){
+	if (file = fopen(fileName,"r")){
 		fgets(line,sizeof(line),file);
 		fgets(line,sizeof(line),file);
 		param = strtok(line,";");
 		repeater = atoi(param);
-		param = strtok(line,NULL);
+		param = strtok(NULL,";");
 		sprintf(startFile,"%s",param);
-		param = strtok(line,NULL);
+		param = strtok(NULL,";");
 		startPos = atoi(param);	
-		param = strtok(line,NULL);
+		param = strtok(NULL,";");
 		frames = atoi(param);
 		fclose(file);
 	}
@@ -62,16 +62,22 @@ void playTestVoice(){
 		return;
 	}
 	if (startPos != oldStartPos || frames != oldFrames){
-		syslog(LOG_NOTICE,"[VoiceTest] parameters different, starting test");
+		syslog(LOG_NOTICE,"[VoiceTest] Parameters different, starting test");
 		oldStartPos = startPos;
 		oldFrames = frames;
+		if (repeaterList[repeater].sockfd == 0) {
+			syslog(LOG_NOTICE,"[VoiceTest] Sockfd for repeater %i = 0",repeater);
+			return;
+		}
+		syslog(LOG_NOTICE,"[VoiceTest] Testing with repeater = %i, startFile = %s, startPos = %i, frames = %i",repeater,startFile,startPos,frames);
 		if (file = fopen(startFile,"rb")){
+			syslog(LOG_NOTICE,"[VoiceTest] Playing startFile %s on repeater %s",startFile,repeaterList[repeater].callsign);
 			while (fread(buffer,VFRAMESIZE,1,file)){
 				slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 				frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
 				packetType = buffer[PTYPE_OFFSET] & 0x0F;
 				if (slotType != 0x2222 && packetType !=3){
-					sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+					sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[repeater].address,sizeof(repeaterList[repeater].address));
 				}
 				else{
 					memcpy(endBuffer,buffer,VFRAMESIZE);
@@ -79,26 +85,29 @@ void playTestVoice(){
 				if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
 			}
 			fclose(file);
+			syslog(LOG_NOTICE,"[VoiceTest] End of startFile");
 		}
 		else{
 			syslog(LOG_NOTICE,"[VoiceTest] Failed to open %s",startFile);
 		}
 		if (file = fopen("chunks.voice","rb")){
+			syslog(LOG_NOTICE,"[VoiceTest] Playing from chunks.voice startPos = %i, frames = %i on repeater %s",startPos,frames,repeaterList[repeater].callsign);
 			fseek(file,startPos * VFRAMESIZE,SEEK_SET);
 			for(i=0;i<frames;i++){
 				if (fread(buffer,VFRAMESIZE,1,file)){
 					slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 					frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
 					packetType = buffer[PTYPE_OFFSET] & 0x0F;
-					if (slotType != 0x2222 && packetType !=3) sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+					if (slotType != 0x2222 && packetType !=3) sendto(repeaterList[repeater].sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[repeater].address,sizeof(repeaterList[repeater].address));
 					if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
 				}
 				else{
 					syslog(LOG_NOTICE,"[VoiceTest] fread failed from chunks.voice");
 				}
 			}
-			sendto(repeaterList[repeater].sockfd,endBuffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+			sendto(repeaterList[repeater].sockfd,endBuffer,VFRAMESIZE,0,(struct sockaddr *)&repeaterList[repeater].address,sizeof(repeaterList[repeater].address));
 			fclose(file);
+			syslog(LOG_NOTICE,"[VoiceTest] End playing chunk");
 		}
 		else{
 			syslog(LOG_NOTICE,"[VoiceTest] Failed to open chunks.voice");
@@ -259,5 +268,7 @@ void *scheduler(){
 			}
 			time(&dmrCleanUpTime);
 		}
+		
+		playTestVoice();
 	}
 }

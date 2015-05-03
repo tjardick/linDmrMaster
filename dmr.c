@@ -82,6 +82,8 @@ void decodeHyteraRrs();
 sqlite3 *openDatabase();
 void closeDatabase();
 
+int numbersIndex[20] = {25,10,50,10,72,15,95,10,120,15,139,20,170,12,190,15,218,15,240,15};
+
 struct allow checkTalkGroup(int dstId, int slot, int callType){
 	struct allow toSend = {0};
 	int i;
@@ -154,17 +156,101 @@ void updateRepeaterTable(int status, int reflector, int repPos){
 	closeDatabase(dbase);
 }
 
-void playVoice(int sockfd, struct sockaddr_in address, char fileName[100],int repPos){
+void playVoiceReflector(int sockfd, struct sockaddr_in address, char fileName[100],int repPos,int reflector){
 	FILE *file;
-	int slotType=0,frameType=0;
+	int slotType=0,frameType=0,packetType = 0;;
 	unsigned char buffer[VFRAMESIZE];
+	unsigned char endBuffer[VFRAMESIZE];
+	int startPos,frames,i,x;
+	int seq = 0;
+
 	sleep(1);
 	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
 	if (file = fopen(fileName,"rb")){
 		while (fread(buffer,VFRAMESIZE,1,file)){
-			sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
 			slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 			frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+			if (slotType != 0x2222 && packetType !=3){
+				if (slotType != 0xeeee && frameType != 0x1111) buffer[4] = seq;
+				sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+				if (slotType != 0xeeee && frameType != 0x1111){
+					seq++;
+					if (seq == 256) seq= 0;
+				}
+			}
+			else{
+				memcpy(endBuffer,buffer,VFRAMESIZE);
+			}
+			if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+		}
+        fclose(file);
+	}
+	else{
+		syslog(LOG_NOTICE,"File %s not found",fileName);
+	}
+	
+	if (file = fopen("numbers.voice","rb")){
+		int counter = 0;
+		int numbers[6];
+		syslog(LOG_NOTICE,"[%s]Analyzing reflector number %i",repeaterList[repPos].callsign,reflector); 
+		while (reflector > 0) {
+			int digit = reflector % 10;
+			counter ++;
+			numbers[counter] = digit;
+			reflector /= 10;
+		}
+		//syslog(LOG_NOTICE,"[%s]Counter = %i",repeaterList[repPos].callsign,counter);
+		for (x = counter;x>0;x--){
+			startPos = numbersIndex[numbers[x] * 2];
+			frames = numbersIndex[(numbers[x] * 2) + 1];
+			//syslog(LOG_NOTICE,"[%s]Playing number %i startPos %i frames %i",repeaterList[repPos].callsign,numbers[x],startPos,frames); 
+			fseek(file,startPos * VFRAMESIZE,SEEK_SET);
+			for(i=0;i<frames;i++){
+				if (fread(buffer,VFRAMESIZE,1,file)){
+					slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+					frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+					packetType = buffer[PTYPE_OFFSET] & 0x0F;
+					if (slotType != 0x2222 && packetType !=3){
+						if (slotType != 0xeeee && frameType != 0x1111) buffer[4] = seq;
+						sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+						if (slotType != 0xeeee && frameType != 0x1111){
+							seq++;
+							if (seq == 256) seq= 0;
+						}
+					}
+					if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
+				}
+				else{
+					syslog(LOG_NOTICE,"[%s] fread failed from numbers.voice",repeaterList[repPos].callsign);
+				}
+			}
+		}
+		sendto(sockfd,endBuffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+		fclose(file);
+	}
+	else{
+		syslog(LOG_NOTICE,"[%s] Failed to open numbers.voice",repeaterList[repPos].callsign);
+	}
+
+}
+
+void playVoiceRepeater(int sockfd, struct sockaddr_in address, char fileName[100],int repPos){
+	FILE *file;
+	int slotType=0,frameType=0,packetType=0;
+	unsigned char buffer[VFRAMESIZE];
+	unsigned char endBuffer[VFRAMESIZE];
+	sleep(1);
+	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
+	if (file = fopen(fileName,"rb")){
+		while (fread(buffer,VFRAMESIZE,1,file)){
+			slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
+			frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
+			if (slotType != 0x2222 && packetType !=3){
+				sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+			}
+			else{
+				memcpy(endBuffer,buffer,VFRAMESIZE);
+			}
 			if (slotType != 0xeeee && frameType != 0x1111) usleep(60000);
 		}
         fclose(file);
@@ -173,6 +259,7 @@ void playVoice(int sockfd, struct sockaddr_in address, char fileName[100],int re
 		syslog(LOG_NOTICE,"File %s not found",fileName);
 	}
 }
+
 
 void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int reflector, int repPos){
 
@@ -192,9 +279,23 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int refle
 		case 3:
 		sprintf(fileName,"intl_not_allowed.voice");
 		break;
+		
+		case 4:
+		if (reflector != 0){
+			sprintf(fileName,"current_ref.voice");
+		}
+		else{
+			sprintf(fileName,"no_reflector.voice");
+		}
+		break;	
+
+		case 5:
+		sprintf(fileName,"unknown_ref.voice");
+		break;	
+
 	}
 	
-	playVoice(sockfd,address,fileName,repPos);	
+	playVoiceReflector(sockfd,address,fileName,repPos,reflector);	
 }
 
 void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int repPos){
@@ -222,7 +323,7 @@ void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int rep
 		break;
 		
 	}
-	playVoice(sockfd,address,fileName,repPos);
+	playVoiceRepeater(sockfd,address,fileName,repPos);
 }
 
 void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in address, int srcId, int repPos){
@@ -545,6 +646,12 @@ void *dmrListener(void *f){
 									}
 								}
 							}
+							
+							if(dstId[2] == 5000 && repeaterList[repPos].pearRepeater[2] == 0){
+								syslog(LOG_NOTICE,"[%s]Requesting info on conference %i %s type %i",repeaterList[repPos].callsign,repeaterList[repPos].conference[2],localReflectors[l].name,localReflectors[l].type);
+								reflectorNewState = 4;
+							}
+							
 							if(dstId[2] > 4000 && dstId[2] < 5000){
 								for(l=0;l<numReflectors;l++){
 									if(localReflectors[l].id == dstId[2]){
@@ -567,6 +674,10 @@ void *dmrListener(void *f){
 											}
 										}
 										break;
+									}
+									else{
+										syslog(LOG_NOTICE,"[%s]Conference %i not found",repeaterList[repPos].callsign,dstId[2]);
+										reflectorNewState = 5;
 									}
 								}
 							}
