@@ -140,6 +140,7 @@ int setRdacRepeater(struct sockaddr_in address){
 	}
 	inet_ntop(AF_INET, &(address.sin_addr), str, INET_ADDRSTRLEN);
 	syslog(LOG_NOTICE,"Repeater not found in database based on IP %s, assigning pos %i",str,i);
+	sqlite3_finalize(stmt);
 	closeDatabase(db);
 	return i;
 }

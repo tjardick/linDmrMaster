@@ -269,6 +269,6 @@ void *scheduler(){
 			time(&dmrCleanUpTime);
 		}
 		
-		playTestVoice();
+		//playTestVoice();
 	}
 }

@@ -61,10 +61,11 @@ struct allow{
 
 struct header{
 	bool responseRequested;
-        int dataPacketFormat;
-        int sapId;
-        int appendBlocks;
+    int dataPacketFormat;
+    int sapId;
+    int appendBlocks;
 };
+
 
 void delRdacRepeater();
 void delRepeater();
@@ -199,11 +200,9 @@ void playVoiceReflector(int sockfd, struct sockaddr_in address, char fileName[10
 			numbers[counter] = digit;
 			reflector /= 10;
 		}
-		//syslog(LOG_NOTICE,"[%s]Counter = %i",repeaterList[repPos].callsign,counter);
 		for (x = counter;x>0;x--){
 			startPos = numbersIndex[numbers[x] * 2];
 			frames = numbersIndex[(numbers[x] * 2) + 1];
-			//syslog(LOG_NOTICE,"[%s]Playing number %i startPos %i frames %i",repeaterList[repPos].callsign,numbers[x],startPos,frames); 
 			fseek(file,startPos * VFRAMESIZE,SEEK_SET);
 			for(i=0;i<frames;i++){
 				if (fread(buffer,VFRAMESIZE,1,file)){
@@ -234,11 +233,14 @@ void playVoiceReflector(int sockfd, struct sockaddr_in address, char fileName[10
 
 }
 
-void playVoiceRepeater(int sockfd, struct sockaddr_in address, char fileName[100],int repPos){
-	FILE *file;
+void playVoiceRepeater(int sockfd, struct sockaddr_in address, char fileName[100],int repPos, int pearRepPos){
+	FILE *file,file1,file2;
 	int slotType=0,frameType=0,packetType=0;
 	unsigned char buffer[VFRAMESIZE];
 	unsigned char endBuffer[VFRAMESIZE];
+	int seq = 0;
+	int x;
+	
 	sleep(1);
 	syslog(LOG_NOTICE,"[%s]Playing %s",repeaterList[repPos].callsign,fileName);
 	if (file = fopen(fileName,"rb")){
@@ -246,7 +248,12 @@ void playVoiceRepeater(int sockfd, struct sockaddr_in address, char fileName[100
 			slotType = buffer[SLOT_TYPE_OFFSET1] << 8 | buffer[SLOT_TYPE_OFFSET2];
 			frameType = buffer[FRAME_TYPE_OFFSET1] << 8 | buffer[FRAME_TYPE_OFFSET2];
 			if (slotType != 0x2222 && packetType !=3){
+				if (slotType != 0xeeee && frameType != 0x1111) buffer[4] = seq;
 				sendto(sockfd,buffer,VFRAMESIZE,0,(struct sockaddr *)&address,sizeof(address));
+				if (slotType != 0xeeee && frameType != 0x1111){
+					seq++;
+					if (seq == 256) seq= 0;
+				}
 			}
 			else{
 				memcpy(endBuffer,buffer,VFRAMESIZE);
@@ -258,6 +265,16 @@ void playVoiceRepeater(int sockfd, struct sockaddr_in address, char fileName[100
 	else{
 		syslog(LOG_NOTICE,"File %s not found",fileName);
 	}
+	//play callsign
+	/*for (x=0;i<strlen(repeaterList(pearRepPos).callsign;i++){
+		if (isalpha(repeaterList(pearRepPos).callsign[x])){
+			int position = pearRepPos).callsign[x] - 65;
+		}
+		if (isdigit(repeaterList(pearRepPos).callsign[x])){
+			int position = repeaterList(pearRepPos).callsign[x]);
+		}
+	
+	}*/
 }
 
 
@@ -298,7 +315,7 @@ void reflectorStatus(int sockfd, struct sockaddr_in address,int status,int refle
 	playVoiceReflector(sockfd,address,fileName,repPos,reflector);	
 }
 
-void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int repPos){
+void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int repPos, int pearRepPos){
 	char fileName[100];
 
 	switch (status) {
@@ -323,7 +340,7 @@ void repConnectStatus(int sockfd, struct sockaddr_in address,int status, int rep
 		break;
 		
 	}
-	playVoiceRepeater(sockfd,address,fileName,repPos);
+	playVoiceRepeater(sockfd,address,fileName,repPos,pearRepPos);
 }
 
 void echoTest(unsigned char buffer[VFRAMESIZE],int sockfd, struct sockaddr_in address, int srcId, int repPos){
@@ -875,7 +892,7 @@ void *dmrListener(void *f){
 								releaseBlock[slot] = true;
 							}
 							if (repConnectNewState !=0 && slot ==2){
-								repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos);
+								repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos,repeaterList[repPos].pearPos[2]);
 								repConnectNewState = 0;
 							}
 							if (reflectorNewState !=0 && slot ==2){
@@ -980,7 +997,7 @@ void *dmrListener(void *f){
 					syslog(LOG_NOTICE,"[%s]Voice call ended after timeout on slot 2",repeaterList[repPos].callsign);
 					logTraffic(srcId[2],dstId[2],slot,"Voice",callType[2],repeaterList[repPos].callsign);
 					if (repConnectNewState !=0 && slot ==2){
-						repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos);
+						repConnectStatus(sockfd,repeaterList[repPos].address,repConnectNewState,repPos,repeaterList[repPos].pearPos[2]);
 						repConnectNewState = 0;
 					}
 					if (reflectorNewState !=0 && slot ==2){
