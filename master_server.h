@@ -139,7 +139,7 @@ extern struct repeater repeaterList[100];
 extern struct repeater rdacList[100];
 extern struct masterData sMaster;
 extern struct masterInfo master;
-extern struct reflector localReflectors[50];
+extern struct reflector localReflectors[100];
 extern struct ts tsInfo;
 extern char databaseServer[50];
 extern char databaseUser[20];

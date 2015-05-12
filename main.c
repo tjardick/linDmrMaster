@@ -446,13 +446,17 @@ void getLocalReflectors(){
         db = openDatabase();
         sprintf(SQLQUERY,"SELECT id,name,type FROM localReflectors");
         if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
-                while (sqlite3_step(stmt) == SQLITE_ROW){
-                        localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
-                        sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
-						localReflectors[numReflectors].type = sqlite3_column_int(stmt,2);
-			syslog(LOG_NOTICE,"Added reflector %i %s type %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name,localReflectors[numReflectors].type == 1 ? "intl":"local");
-			numReflectors++;
-                }
+			while (sqlite3_step(stmt) == SQLITE_ROW){
+				localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
+				sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
+				localReflectors[numReflectors].type = sqlite3_column_int(stmt,2);
+				syslog(LOG_NOTICE,"Added reflector %i %s type %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name,localReflectors[numReflectors].type == 1 ? "intl":"local");
+				numReflectors++;
+				if (numReflectors > 100){
+					syslog(LOG_NOTICE,"MORE THAN 100 REFLECTORS DEFINED IN DATABASE, ONLY FIRST 100 ADDED");
+					break;
+				}
+			}
         }
         else{
                 syslog(LOG_NOTICE,"failed to read localReflectors, query bad");
