@@ -38,7 +38,7 @@ struct masterInfo master;
 static const struct masterInfo emptyMaster = {0};
 struct ts tsInfo = {0};
 struct sockaddr_in discardList[100] = {0};
-struct reflector  localReflectors[50] = {0};
+struct reflector  localReflectors[100] = {0};
 
 int rdacSock=0;
 int highestRepeater = 0;
