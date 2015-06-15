@@ -58,11 +58,106 @@ struct allow{
 
 struct allow checkTalkGroup();
 
+void sendTalkgroupInfo(int sockfd,struct sockaddr_in servaddr){
+	char rreqResponse[200];
+	char myCCInfo[21];
+	char announced[90];
+	int i;
+	bool cc2Send = false;
+	
+	sprintf(myCCInfo,"%s%s",master.ownCountryCode,master.ownRegion);
+	sprintf(rreqResponse,"TS1R%-20s%-20s:%s\n",myCCInfo,master.ownName,master.announcedCC1);
+	syslog(LOG_NOTICE,"%s",rreqResponse);
+	sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+	
+	for (i=0;i<highestRepeater;i++){
+		if (repeaterList[i].address.sin_addr.s_addr !=0){
+			if(repeaterList[i].conference[2] !=0 && repeaterList[i].conferenceType[2] == 1){
+				sprintf(announced,"%s",master.announcedCC2);
+				unsigned char strRef[6];
+				int CC2len = strlen(announced);
+				sprintf(strRef,"%5i",repeaterList[i].conference[2]);
+				memcpy(announced + (CC2len -4),strRef,6);
+				sprintf(rreqResponse,"TS2R%-20s%-20s:%s\n",myCCInfo,master.ownName,announced);
+				syslog(LOG_NOTICE,"%s",rreqResponse);
+				sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+				cc2Send = true;
+			}
+		}
+	}
+	
+	if(!cc2Send){
+		sprintf(rreqResponse,"TS2R%-20s%-20s:%s\n",myCCInfo,master.ownName,master.announcedCC2);
+		syslog(LOG_NOTICE,"%s",rreqResponse);
+		sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+	}
+
+}
+
+void sendRepeaterInfo(int sockfd,struct sockaddr_in servaddr,int repPos){
+	unsigned char ip[INET_ADDRSTRLEN];
+	int i;
+	unsigned char conference[7];
+	unsigned char repInfo[200];
+
+	if (repPos == 100){
+		for (i=0;i<highestRepeater;i++){
+			if (repeaterList[i].address.sin_addr.s_addr !=0){
+				inet_ntop(AF_INET, &(repeaterList[i].address.sin_addr), ip, INET_ADDRSTRLEN);
+				if(repeaterList[i].conference[2] !=0 && repeaterList[i].conferenceType[2] == 1){
+					sprintf(conference,"%i",repeaterList[i].conference[2]);
+				}
+				else{
+					sprintf(conference,"0");
+				}
+				sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     %-6s%-10s%-12s%-3s%i\n",i,ip,repeaterList[i].id,baseDmrPort+i,
+				master.ownCCInt,master.ownRegionInt,version,repeaterList[i].callsign,repeaterList[i].txFreq,repeaterList[i].shift,conference,
+				repeaterList[i].hardware,repeaterList[i].firmware,repeaterList[i].mode,masterDmrId);
+				sendto(sockfd,repInfo,strlen(repInfo),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+				syslog(LOG_NOTICE,"%s",repInfo);
+				usleep(60000);
+			}
+		}
+	}
+	else{
+		inet_ntop(AF_INET, &(repeaterList[repPos].address.sin_addr), ip, INET_ADDRSTRLEN);
+		if(repeaterList[repPos].conference[2] !=0 && repeaterList[repPos].conferenceType[2] == 1){
+			sprintf(conference,"%i",repeaterList[repPos].conference[2]);
+		}
+		else{
+			sprintf(conference,"0");
+		}
+		sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     %-6s%-10s%-12s%-3s%i",repPos,ip,repeaterList[repPos].id,baseDmrPort+repPos,
+		master.ownCCInt,master.ownRegionInt,version,repeaterList[repPos].callsign,repeaterList[repPos].txFreq,repeaterList[repPos].shift,conference,
+		repeaterList[repPos].hardware,repeaterList[repPos].firmware,repeaterList[repPos].mode,masterDmrId);
+		sendto(sockfd,repInfo,strlen(repInfo),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+		syslog(LOG_NOTICE,"%s",repInfo);
+	}
+}
+
+void sendReflectorStatus(int sockfd,struct sockaddr_in servaddr,int repPos){
+		unsigned char refStatus[50];
+		int i;
+
+		if (repPos == 100){
+			for(i=0;i<highestRepeater;i++){
+				if (repeaterList[i].id != 0 && repeaterList[i].dmrOnline && repeaterList[i].conference[2] !=0 && repeaterList[i].conferenceType[2] == 1){
+					sprintf(refStatus,"%6.6s@%6.6i@%4.4i\n",repeaterList[i].callsign,repeaterList[i].id,repeaterList[i].conference[2]);
+					sendto(sockfd,refStatus,27,0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+					usleep(60000);
+				}
+			}
+		}
+		else{
+			sprintf(refStatus,"%6.6s@%6.6i@%4.4i\n",repeaterList[repPos].callsign,repeaterList[repPos].id,repeaterList[repPos].conference[2]);
+			sendto(sockfd,refStatus,27,0,(struct sockaddr *)&servaddr,sizeof(servaddr));
+		}
+}
+
 void *sMasterThread(){
 	int sockfd = 0;
 	char ping[50];
 	unsigned char buffer[VFRAMESIZE];
-	unsigned char repInfo[200];
 	int n,rc,i;
 	fd_set fdMaster;
 	struct timeval timeout;
@@ -73,10 +168,12 @@ void *sMasterThread(){
 	int srcId = 0;
 	int dstId = 0;
 	int callType = 0;
+	int defTG2 = 9;
 	unsigned char origC[5][3];
 	struct sockaddr_in servaddr,cliaddr;
 	struct allow toSend = {0};
 	bool block[3];
+	bool reflectorTraffic = false;
 	
 	syslog(LOG_NOTICE,"Starting sMaster thread");
 	block[1] = false;
@@ -114,27 +211,8 @@ void *sMasterThread(){
 			if (n<VFRAMESIZE){
 				if (strstr(buffer,"RREQ")){
 					syslog(LOG_NOTICE,"RREQ from sMaster");
-					char rreqResponse[200];
-					char myCCInfo[21];
-					sprintf(myCCInfo,"%s%s",master.ownCountryCode,master.ownRegion);
-					sprintf(rreqResponse,"TS1R%-20s%-20s%s",myCCInfo,master.ownName,master.announcedCC1);
-					syslog(LOG_NOTICE,"RREQ response %s",rreqResponse);
-					sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-					sprintf(rreqResponse,"TS2R%-20s%-20s%s",myCCInfo,master.ownName,master.announcedCC2);
-					syslog(LOG_NOTICE,"RREQ response %s",rreqResponse);
-					sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-					unsigned char ip[INET_ADDRSTRLEN];
-					for (i=0;i<highestRepeater;i++){
-						if (repeaterList[i].address.sin_addr.s_addr !=0){
-							inet_ntop(AF_INET, &(repeaterList[i].address.sin_addr), ip, INET_ADDRSTRLEN);
-							sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     0     %-10s%-12s%-3s",i,ip,repeaterList[i].id,baseDmrPort+i,
-							master.ownCCInt,master.ownRegionInt,version,repeaterList[i].callsign,repeaterList[i].txFreq,repeaterList[i].shift,
-							repeaterList[i].hardware,repeaterList[i].firmware,repeaterList[i].mode);
-							sendto(sockfd,repInfo,strlen(repInfo),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-							syslog(LOG_NOTICE,"RREQ response %s",repInfo);
-							usleep(60000);
-						}
-					}
+					sendTalkgroupInfo(sockfd,servaddr);
+					sendRepeaterInfo(sockfd,servaddr,100);
 					time(&reportTime);
 				}
 				if (strstr(buffer,"PONG")){
@@ -143,71 +221,85 @@ void *sMasterThread(){
 			}
 			else{
 				slot = buffer[SLOT_OFFSET1] / 16;
-				if (dmrState[slot] == IDLE || sMaster.sending[slot]){
-					packetType = buffer[PTYPE_OFFSET];
-					sync = buffer[SYNC_OFFSET1] << 8 | buffer[SYNC_OFFSET2];
-					switch (packetType){
-				
-						case 0x01:
-						if (sync == VCALL && dmrState[slot] != VOICE && block[slot] == false){
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
-							toSend = checkTalkGroup(dstId,slot,callType);
-							if (toSend.repeater == false){
-								block[slot] = true;
-								break;
-							}
-							sMaster.sending[slot] = true;
-							dmrState[slot] = VOICE;
-							syslog(LOG_NOTICE,"[sMaster]Voice call started on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
-							if (buffer[90] !=0) {
-								memcpy(origC[slot],buffer+90,4);
-								syslog(LOG_NOTICE,"[sMaster]Replacing country code to %s",origC[slot]);
-							} 
-							else{ 
-								memcpy(origC[slot],buffer+64,4);
-							}
-							break;
-						}
-						if (sync == DCALL && dmrState[slot] != DATA){
-							srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
-							dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
-							callType = buffer[TYP_OFFSET1];
-							syslog(LOG_NOTICE,"[sMaster]Data on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
-							break;
-						}
-						break;
-				
-						case 0x03:
-						if (sync == VCALLEND){
-							dmrState[slot] = IDLE;
-							sMaster.sending[slot] = false;
-							block[slot] = false;
-							syslog(LOG_NOTICE,"[sMaster]Voice call ended on slot %i",slot);
-						}
-						break;
+				dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+				srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+				if (buffer[0] == 'R'){
+					if (!reflectorTraffic){
+						syslog(LOG_NOTICE,"[sMaster]Incoming traffic from reflector %i source id = %i",dstId,srcId);
+						reflectorTraffic = true;
 					}
-					memcpy(buffer+64,origC[slot],4);
-					if (!block[slot]){
-						for (i=0;i<highestRepeater;i++){
-							if (repeaterList[i].address.sin_addr.s_addr !=0 && !repeaterList[i].sending[slot]){
-								sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
-							}
+					//changed here !!!
+					if (buffer[1] == 0x02) buffer[0] = 0x01; else buffer[0] = buffer[1];
+					memcpy(buffer+64,(char*)&defTG2,sizeof(int));
+					//end
+					for (i=0;i<highestRepeater;i++){
+						if(dstId == repeaterList[i].conference[2] && repeaterList[i].conferenceType[2] == 1){
+							sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
 						}
 					}
 				}
 				else{
-					syslog(LOG_NOTICE,"[sMaster]Incomming traffic on slot %i, but DMR not IDLE",slot);
+					if (dmrState[slot] == IDLE || sMaster.sending[slot]){
+						packetType = buffer[PTYPE_OFFSET] && 0x0f;
+						sync = buffer[SYNC_OFFSET1] << 8 | buffer[SYNC_OFFSET2];
+						switch (packetType){
+				
+							case 0x01:
+							if (sync == VCALL && dmrState[slot] != VOICE && block[slot] == false){
+								srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+								dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+								callType = buffer[TYP_OFFSET1];
+								toSend = checkTalkGroup(dstId,slot,callType);
+								if (toSend.repeater == false){
+									block[slot] = true;
+									break;
+								}
+								sMaster.sending[slot] = true;
+								dmrState[slot] = VOICE;
+								syslog(LOG_NOTICE,"[sMaster]Voice call started on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
+								if (buffer[90] !=0) {
+									memcpy(origC[slot],buffer+90,4);
+									syslog(LOG_NOTICE,"[sMaster]Replacing country code to %s",origC[slot]);
+								} 
+								else{ 
+									memcpy(origC[slot],buffer+64,4);
+								}
+								break;
+							}
+							if (sync == DCALL && dmrState[slot] != DATA){
+								srcId = buffer[SRC_OFFSET3] << 16 | buffer[SRC_OFFSET2] << 8 | buffer[SRC_OFFSET1];
+								dstId = buffer[DST_OFFSET3] << 16 | buffer[DST_OFFSET2] << 8 | buffer[DST_OFFSET1];
+								callType = buffer[TYP_OFFSET1];
+								syslog(LOG_NOTICE,"[sMaster]Data on slot %i src %i dst %i type %i",slot,srcId,dstId,callType);
+								break;
+							}
+							break;
+				
+							case 0x03:
+							if (sync == VCALLEND){
+								dmrState[slot] = IDLE;
+								sMaster.sending[slot] = false;
+								block[slot] = false;
+								syslog(LOG_NOTICE,"[sMaster]Voice call ended on slot %i",slot);
+							}
+							break;
+						}
+						memcpy(buffer+64,origC[slot],4);
+						if (!block[slot]){
+							for (i=0;i<highestRepeater;i++){
+								if (repeaterList[i].address.sin_addr.s_addr !=0 && !repeaterList[i].sending[slot]){
+									sendto(repeaterList[i].sockfd,buffer,72,0,(struct sockaddr *)&repeaterList[i].address,sizeof(repeaterList[i].address));
+								}
+							}
+						}
+					}
+					else{
+						syslog(LOG_NOTICE,"[sMaster]Incomming traffic on slot %i, but DMR not IDLE",slot);
+					}
 				}
 			}
 		}
 		else{
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting sMaster thread (restart)");
-				close(sockfd);
-				pthread_exit(NULL);
-			}
 			time(&timeNow);
 			if (sMaster.sending[1] && dmrState[1] != IDLE){
 				dmrState[1] = IDLE;
@@ -221,32 +313,18 @@ void *sMasterThread(){
 				block[2] = false;
 				syslog(LOG_NOTICE,"[sMaster]Slot 2 IDLE");
 			}
+			if (reflectorTraffic){
+				reflectorTraffic = false;
+				syslog(LOG_NOTICE,"[sMaster] Voice call ended on reflector");
+			}	
+			
 			if (difftime(timeNow,needPingTime) > 5){
 				time(&needPingTime);
 				sendto(sockfd,ping,strlen(ping),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
 			}
 			if (difftime(timeNow,reportTime) > 320){
-				char rreqResponse[200];
-				char myCCInfo[21];
-				sprintf(myCCInfo,"%s%s",master.ownCountryCode,master.ownRegion);
-				sprintf(rreqResponse,"TS1R%-20s%-20s%s",myCCInfo,master.ownName,master.announcedCC1);
-				syslog(LOG_NOTICE,"Report to sMaster %s",rreqResponse);
-				sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-				sprintf(rreqResponse,"TS2R%-20s%-20s%s",myCCInfo,master.ownName,master.announcedCC2);
-				syslog(LOG_NOTICE,"Report to sMaster %s",rreqResponse);
-				sendto(sockfd,rreqResponse,strlen(rreqResponse),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-				unsigned char ip[INET_ADDRSTRLEN];
-				for (i=0;i<highestRepeater;i++){
-					if (repeaterList[i].address.sin_addr.s_addr !=0){
-						inet_ntop(AF_INET, &(repeaterList[i].address.sin_addr), ip, INET_ADDRSTRLEN);
-							sprintf(repInfo,"RPT%02i%-15s%i%i%i%i%-4s%-16s%-9s%-6s0     0     %-10s%-12s%-3s",i,ip,repeaterList[i].id,baseDmrPort+i,
-							master.ownCCInt,master.ownRegionInt,version,repeaterList[i].callsign,repeaterList[i].txFreq,repeaterList[i].shift,
-							repeaterList[i].hardware,repeaterList[i].firmware,repeaterList[i].mode);
-						sendto(sockfd,repInfo,strlen(repInfo),0,(struct sockaddr *)&servaddr,sizeof(servaddr));
-						syslog(LOG_NOTICE,"Report to sMaster %s",repInfo);
-						usleep(60000);
-					}
-				}
+				sendTalkgroupInfo(sockfd,servaddr);
+				sendRepeaterInfo(sockfd,servaddr,100);
 				time(&reportTime);
 			}
 		}

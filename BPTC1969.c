@@ -17,9 +17,6 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-/*Source code inspired on the work of Paul Griffiths
-  www.paulgriffiths.net
-*/
 
 #include "master_server.h"
 
@@ -35,21 +32,24 @@ bool * extractInfo(bool bits[264]){
         static bool info[196];
         int bytePos=0;
         int i;
+		unsigned char infoBits[200];
+		
+		memset(infoBits,0,200);
 
         //printf("Info bits: ");
         for(i=0;i<98;i++){
                 info[bytePos] = bits[i];
-                //printf("%i",info[bytePos]);
+                if (debug==1) sprintf(infoBits,"%s%i",infoBits,info[bytePos]);
                 bytePos++;
         }
 
         for(i=166;i<264;i++){
                 info[bytePos] = bits[i];
-                //printf("%i",info[bytePos]);
+                if (debug==1) sprintf(infoBits,"%s%i",infoBits,info[bytePos]);
                 bytePos++;
         }
 
-        //printf("\n");
+        if (debug==1) syslog(LOG_NOTICE,"[BPTC1969-extractInfo]%s",infoBits);
         return info;
 }
 
@@ -114,57 +114,61 @@ struct header decodeDataHeader(bool bits[264]){
         static bool *payloadBits; //96  bits
         int blocksToFollow=0,a;
         unsigned char dpf=0,sap=0,bitPadding=0;
-	struct header headerDecode;
+		struct header headerDecode;
+		unsigned char stringPayload[100];
+		
+		memset(stringPayload,0,100);
 
         infoBits = extractInfo(bits);
         deInterleavedBits = deInterleave(infoBits);
         payloadBits = extractPayload(deInterleavedBits);
 
-        /*printf("Payload bits\n");
-        for(a=0;a<96;a++){
-                printf("%i",*(payloadBits+a));
+        if (debug ==1){
+			for(a=0;a<96;a++){
+				sprintf(stringPayload,"%s%i",stringPayload,*(payloadBits+a));
+			}
+			syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]%s",stringPayload);
         }
-        printf("\n");*/
         if(*(payloadBits+1) == 1){
 		headerDecode.responseRequested = true;
-		 //syslog(LOG_NOTICE,"response requested"); 
+		 if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]response requested"); 
 	}
 	else{
 		headerDecode.responseRequested = false;
-		//syslog(LOG_NOTICE,"NO response requested");
+		if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]NO response requested");
 	}
 
         for(a=4;a<8;a++){
                 if(*(payloadBits + a) == true) dpf = dpf + (char)(8 / pow(2,a-4));
         }
-        //syslog(LOG_NOTICE,"Data Packet Format: ");
+        if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Data Packet Format: ");
 	headerDecode.dataPacketFormat = dpf;
         switch (dpf){
                 case 0:
-                //syslog(LOG_NOTICE,"Unified Data Transport\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Unified Data Transport\n");
                 break;
 
                 case 1:
-                //syslog(LOG_NOTICE,"Response packet\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Response packet\n");
                 break;
 
                 case 2:
-                //syslog(LOG_NOTICE,"Data packet with unconfirmed delivery\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Data packet with unconfirmed delivery\n");
                 break;
 
                 case 3:
-                //syslog(LOG_NOTICE,"Data packet with confirmed delivery\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Data packet with confirmed delivery\n");
                 break;
 
                 case 13:
-                //syslog(LOG_NOTICE,"Short Data: Defined\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Short Data: Defined\n");
                 break;
                 case 14:
-                //syslog(LOG_NOTICE,"Short Data: Raw or Status/Precoded\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Short Data: Raw or Status/Precoded\n");
                 break;
 
                 case 15:
-                //syslog(LOG_NOTICE,"Proprietary Data Packet\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Proprietary Data Packet\n");
                 break;
 
         }
@@ -173,36 +177,36 @@ struct header decodeDataHeader(bool bits[264]){
                 if(*(payloadBits + a) == true) sap = sap + (char)(8 / pow(2,a-8));
         }
 		
-	//syslog(LOG_NOTICE,"SAP id: ");
+	if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]SAP id: ");
 	headerDecode.sapId = sap;
         switch (sap){
 
                 case 0:
-                //syslog(LOG_NOTICE,"Unified Data Transport\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Unified Data Transport\n");
                 break;
 
                 case 2:
-                //syslog(LOG_NOTICE,"TCP/IP header compression\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]TCP/IP header compression\n");
                 break;
 
                 case 3:
-                //syslog(LOG_NOTICE,"UDP/IP header compression\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]UDP/IP header compression\n");
                 break;
 
                 case 4:
-                //syslog(LOG_NOTICE,"IP based Packet data\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]IP based Packet data\n");
                 break;
 
                 case 5:
-                //syslog(LOG_NOTICE,"Address Resolution Protocol(ARP)\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Address Resolution Protocol(ARP)\n");
                 break;
 
                 case 9:
-                //syslog(LOG_NOTICE,"Proprietary Packet data\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Proprietary Packet data\n");
                 break;
 
                 case 10:
-                //syslog(LOG_NOTICE,"Short Data\n");
+                if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Short Data\n");
                 break;
 
         }
@@ -211,7 +215,7 @@ struct header decodeDataHeader(bool bits[264]){
                          if(*(payloadBits + a) == true) blocksToFollow = blocksToFollow + (char)(8 / pow(2,a-12));
                 }
                 headerDecode.appendBlocks = blocksToFollow;
-		//syslog(LOG_NOTICE,"Appended blocks : %i\n",blocksToFollow);
+				if (debug ==1) syslog(LOG_NOTICE,"[BPTC1969-decodeDataHeader]Appended blocks : %i\n",blocksToFollow);
 
                 for(a=72;a<80;a++){
                          if(*(payloadBits + a) == true) bitPadding = bitPadding + (char)(128 / pow(2,a-12));
@@ -227,22 +231,23 @@ unsigned char *  decodeHalfRate(bool bits[264]){
         bool *infoBits; //196 info bits
         bool *deInterleavedBits; //196 bits
         static bool *payloadBits; //96  bits
-	int i,a,x=0;
+		int i,a,x=0;
         static unsigned char bb[12] = {0};
+		unsigned char bbb[100];
 
         infoBits = extractInfo(bits);
         deInterleavedBits = deInterleave(infoBits);
         payloadBits = extractPayload(deInterleavedBits);
 
-
+		memset(bbb,0,100);
         for (a=0;a<96;a=a+8){
                 bb[x] = 0;
                 for (i=0;i<8;i++){
                         if(payloadBits[a+i] == true) bb[x] = bb[x] + (char)(128 / pow(2,i));
                 }
-                //printf("(%02X)%c",bb[x],bb[x]);
+                if (debug == 1) sprintf(bbb,"%s(%02X)%c",bbb,bb[x],bb[x]);
                 x++;
         }
-        //printf("\n");
+		if (debug == 1) syslog(LOG_NOTICE,"[BPTC1969-decodeHalfRate]%s",bbb);
         return bb;
 }

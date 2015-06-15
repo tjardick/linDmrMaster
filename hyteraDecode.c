@@ -24,7 +24,7 @@ sqlite3 *openDatabase();
 void closeDatabase();
 
 
-void decodeHyteraGpsTriggered(int radioId,struct repeater repeater, unsigned char data[300]){
+void decodeHyteraGpsTriggered(int radioId,int destId,struct repeater repeater, unsigned char data[300]){
 
 	struct gpsCoordinates gpsData = {0};
 
@@ -38,10 +38,10 @@ void decodeHyteraGpsTriggered(int radioId,struct repeater repeater, unsigned cha
 
 	syslog(LOG_NOTICE,"[%s]Decoded GPS data triggered(Hytera): LAT(%s) LONG(%s) SPEED(%s) HEADING(%s)",repeater.callsign,gpsData.latitude,gpsData.longitude,gpsData.speed,gpsData.heading);
 	
-	if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,repeater);
+	if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,destId,repeater);
 }
 
-void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char data[300]){
+void decodeHyteraGpsButton(int radioId,int destId,struct repeater repeater, unsigned char data[300]){
 
         struct gpsCoordinates gpsData = {0};
 
@@ -56,7 +56,7 @@ void decodeHyteraGpsButton(int radioId,struct repeater repeater, unsigned char d
 
         syslog(LOG_NOTICE,"[%s]Decoded GPS data button(Hytera): LAT(%s) LONG(%s) SPEED(%s) HEADING(%s)",repeater.callsign,gpsData.latitude,gpsData.longitude,gpsData.speed,gpsData.heading);
 
-        if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,repeater);
+        if (checkCoordinates(gpsData,repeater) == 1) sendAprs(gpsData,radioId,destId,repeater);
 }
 
 
@@ -89,16 +89,21 @@ void decodeHyteraRrs(struct repeater repeater, unsigned char data[300]){
 		else{
 			sqlite3_finalize(stmt);
 			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+			return;
 		}
 	}
 	else{
 		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
+		closeDatabase(dbase);
+		return;
+
 	}
 
         time_t now = time(NULL);
         struct tm *t = localtime(&now);
         strftime(timeStamp,sizeof(timeStamp),"%Y-%m-%d %H:%M:%S",t);
-	sprintf(SQLQUERY,"REPLACE into rrs (radioId,callsign,name,registerTime,onRepeater) VALUES (%i,'%s','%s','%s','%s')",srcId,callsign,name,timeStamp,repeater.callsign);
+	sprintf(SQLQUERY,"REPLACE into rrs (radioId,callsign,name,registerTime,onRepeater,unixTime) VALUES (%i,'%s','%s','%s','%s',%lu)",srcId,callsign,name,timeStamp,repeater.callsign,now);
 	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
 		syslog(LOG_NOTICE,"Failed to update rrs in database: %s",sqlite3_errmsg(dbase));
 	}
@@ -127,14 +132,18 @@ void decodeHyteraOffRrs(struct repeater repeater, unsigned char data[300]){
 		else{
 			sqlite3_finalize(stmt);
 			syslog(LOG_NOTICE,"[%s]DMR ID %i not found in database",repeater.callsign,srcId);
+			closeDatabase(dbase);
+			return;
 		}
 	}
 	else{
 		syslog(LOG_NOTICE,"[%s]Bad query %s",repeater.callsign,SQLQUERY);
 	}
 	sprintf(SQLQUERY,"DELETE FROM rrs where radioId = %i",srcId);
-	if (!sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
+	if (sqlite3_exec(dbase,SQLQUERY,0,0,0) != 0){
 		syslog(LOG_NOTICE,"Failed to delete rrs in database: %s",sqlite3_errmsg(dbase));
+		closeDatabase(dbase);
+		return;
 	}
 
 	syslog(LOG_NOTICE,"[%s]Hytera RADIO OFFLINE from %i %s",repeater.callsign,srcId,callsign);

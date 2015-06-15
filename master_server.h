@@ -37,6 +37,7 @@
 #include <signal.h>
 #include <math.h>
 #include <regex.h>
+#include <ctype.h>
 
 struct repeater{
 	struct sockaddr_in address;
@@ -44,8 +45,15 @@ struct repeater{
 	bool dmrOnline;
 	bool rdacOnline;
 	bool rdacUpdated;
+	bool intlRefAllow;
+	int rdacUpdateAttempts;
 	bool sending[3];
+	int conference[3];
+	int conferenceType[3];
+	int pearRepeater[3];
+	int pearPos[3];
 	int id;
+	time_t pearTimeout;
 	time_t lastPTPPConnect;
 	time_t lastDMRConnect;
 	time_t lastRDACConnect;
@@ -60,6 +68,8 @@ struct repeater{
 	unsigned char aprsPass[6];
 	unsigned char aprsBeacon[100];
 	unsigned char aprsPHG[7];
+	int autoReflector;
+	int upDated;
 };
 
 
@@ -87,8 +97,8 @@ struct masterInfo{
 	char ownRegion[2];
 	char sMasterIp[100];
 	char sMasterPort[6];
-	char announcedCC1[80];
-	char announcedCC2[80];
+	char announcedCC1[90];
+	char announcedCC2[90];
 	int ownCCInt;
 	int ownRegionInt;
 	int sMasterTS1GroupCount;
@@ -117,12 +127,19 @@ struct gpsCoordinates{
 	unsigned char heading[4];
 };
 
+struct reflector{
+	int id;
+	unsigned char name[55];
+	int type;
+};
+
 typedef enum {VOICE, DATA, IDLE} state;
 
 extern struct repeater repeaterList[100];
 extern struct repeater rdacList[100];
 extern struct masterData sMaster;
 extern struct masterInfo master;
+extern struct reflector localReflectors[100];
 extern struct ts tsInfo;
 extern char databaseServer[50];
 extern char databaseUser[20];
@@ -137,6 +154,7 @@ extern int rdacPort;
 extern int baseRdacPort;
 extern int maxRepeaters;
 extern int echoId;
+extern int echoSlot;
 extern int rrsGpsId;
 extern state dmrState[3];
 extern int (*sMasterTS1List)[2];
@@ -147,8 +165,10 @@ extern int ownCCInt;
 extern int ownRegionInt;
 extern char version[5];
 extern sqlite3 *db;
-extern int restart;
 extern char page[50];
 extern char aprsUrl[100];
 extern char aprsPort[7];
 extern int aprsSockFd;
+extern int numReflectors;
+extern int masterDmrId;
+extern int debug;

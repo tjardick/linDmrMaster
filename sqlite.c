@@ -87,8 +87,10 @@ bool isTableExisting(sqlite3 *db, char *table){
 int initDatabase(sqlite3 *db){
 	char SQLQUERY[1000];
 	
+	srand(time(NULL));
+	int r = rand() % 999999;
 	if (!isTableExisting(db,"master")){
-		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId int default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080')");
+		sprintf(SQLQUERY,"CREATE TABLE master (repTS1 VARCHAR(100) default '',repTS2 VARCHAR(100) default '',sMasterTS1 VARCHAR(100) default '',sMasterTS2 VARCHAR(100) default '', timeBase INTEGER default 60, servicePort int default 50000, rdacPort int default 50002,dmrPort int default 50001, baseDmrPort int default 50100, baseRdacPort int default 50200, maxRepeaters int default 20, echoId int default 9990, rrsGpsId int default 500, aprsUrl VARCHAR(100) default '', aprsPort VARCHAR(7) default '8080', echoSlot integer default 1, masterDmrId integer default %i)",r);
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			sprintf(SQLQUERY,"INSERT INTO master (repTS1) VALUES ('')");
 			if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
@@ -123,7 +125,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"repeaters")){
-		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default '')");
+		sprintf(SQLQUERY,"CREATE TABLE repeaters (repeaterId INTEGER default 0 ,callsign VARCHAR(10) default '',txFreq VARCHAR(10) default '',shift VARCHAR(7) default '', hardware VARCHAR(11) default '', firmware VARCHAR(12) default '', mode VARCHAR(4) default '', currentAddress INTEGER default 0, timeStamp varchar(20) default '1970-1-1 00:00:00', ipAddress VARCHAR(50) default '',language VARCHAR(50) default 'english', geoLocation VARCHAR(20) default '', aprsPass VARCHAR(5) default '0000', aprsBeacon VARCHAR(100) default 'DMR repeater', aprsPHG VARCHHAR(7) default '', currentReflector integer default 0, autoReflector integer default 0, userName default '', upDated integer default 0, lastRdacUpdate varchar(20) default '1970-1-1 00:00:00', online integer default 0, intlRefAllow integer default 1)");
 		if (sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table repeater created");
 		}
@@ -145,7 +147,7 @@ int initDatabase(sqlite3 *db){
 	}
 
 	if (!isTableExisting(db,"rrs")){
-		sprintf(SQLQUERY,"CREATE TABLE rrs (radioId INTEGER default 0 PRIMARY KEY, callsign VARCHAR(32) default '',name VARCHAR(32) default '', registerTime VARCHAR(20) default '1970-01-01 00:00:00', onRepeater VARCHAR(32) default '')");
+		sprintf(SQLQUERY,"CREATE TABLE rrs (radioId INTEGER default 0 PRIMARY KEY, callsign VARCHAR(32) default '',name VARCHAR(32) default '', registerTime VARCHAR(20) default '1970-01-01 00:00:00', onRepeater VARCHAR(32) default '', unixTime long)");
 		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
 			syslog(LOG_NOTICE,"Table rrs created");
 		}
@@ -153,13 +155,12 @@ int initDatabase(sqlite3 *db){
 			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
 			return 0;
 		}
-	}	
-	
-	//check for new fields added later in development
-	if (!isFieldExisting(db,"repeaters","language")){
-		sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN language varchar(50) default 'english'");
-		if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-			syslog(LOG_NOTICE,"field language in repeater created");
+	}
+
+	if (!isTableExisting(db,"traffic")){
+		sprintf(SQLQUERY,"CREATE TABLE traffic (senderId int default 0 PRIMARY KEY,senderCallsign varchar(32) default '',targetId int default 0,targetCallsign varchar(32) default '',channel int default 0,serviceType varchar(15) default 'Voice',callType varchar(15) default 'Group',timeStamp int default 0, onRepeater varchar(32) default '', senderName varchar(32) default '')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table traffic created");
 		}
 		else{
 			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
@@ -167,10 +168,55 @@ int initDatabase(sqlite3 *db){
 		}
 	}
 
-        if (!isFieldExisting(db,"master","rrsGpsId")){
-                sprintf(SQLQUERY,"ALTER TABLE master ADD COLUMN rrsGpsId int default 500");
+	if (!isTableExisting(db,"voiceTraffic")){
+		sprintf(SQLQUERY,"CREATE TABLE voiceTraffic (senderId int default 0 PRIMARY KEY,senderCallsign varchar(32) default '',targetId int default 0,targetCallsign varchar(32) default '',channel int default 0,serviceType varchar(15) default 'Voice',callType varchar(15) default 'Group',timeStamp int default 0, onRepeater varchar(32) default '', senderName varchar(32) default '')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table voiceTraffic created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+
+	if (!isTableExisting(db,"localReflectors")){
+		sprintf(SQLQUERY,"CREATE TABLE localReflectors(id int primary key,name varchar(50),type int default 0)");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table localReflectors created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+	}
+
+
+	if (!isTableExisting(db,"access")){
+		sprintf(SQLQUERY,"CREATE TABLE access(userName varchar(20) default '' PRIMARY KEY, password varchar(20) default '', role varchar(30) default 'log');");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Table access created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+		sprintf(SQLQUERY,"INSERT INTO access (userName,password,role) VALUES ('admin','admin','admin')");
+		if(sqlite3_exec(db,SQLQUERY,NULL,NULL,NULL) == 0){
+			syslog(LOG_NOTICE,"Default admin user created");
+		}
+		else{
+			syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+			return 0;
+		}
+		
+	}
+	
+	//check for new fields added later in development
+
+        if (!isFieldExisting(db,"localReflectors","type")){
+                sprintf(SQLQUERY,"alter table localReflectors add type integer default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field rrsGpsId in master created");
+                        syslog(LOG_NOTICE,"field type in localReflectors created");
                 }
                 else{
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
@@ -178,10 +224,22 @@ int initDatabase(sqlite3 *db){
                 }
         }
 
-        if (!isFieldExisting(db,"master","aprsUrl")){
-                sprintf(SQLQUERY,"ALTER TABLE master ADD COLUMN aprsUrl VARCHAR(100) default ''");
+
+        if (!isFieldExisting(db,"repeaters","intlRefAllow")){
+                sprintf(SQLQUERY,"alter table repeaters add intlRefAllow integer default 1");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field aprsUrl in master created");
+                        syslog(LOG_NOTICE,"field intlRefAllow in repeaters created");
+                }
+                else{
+                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+                        return 0;
+                }
+        }
+		
+        if (!isFieldExisting(db,"master","masterDmrId")){
+                sprintf(SQLQUERY,"alter table master add masterDmrId integer default %i",r);
+                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+                        syslog(LOG_NOTICE,"field masterDmrId in master created");
                 }
                 else{
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
@@ -189,55 +247,10 @@ int initDatabase(sqlite3 *db){
                 }
         }
 
-        if (!isFieldExisting(db,"master","aprsPort")){
-                sprintf(SQLQUERY,"ALTER TABLE master ADD COLUMN aprsPort VARCHAR(7) default '8080'");
+        if (!isFieldExisting(db,"master","debug")){
+                sprintf(SQLQUERY,"alter table master add debug integer default 0");
                 if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field aprsPort in master created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-
-        if (!isFieldExisting(db,"repeaters","geoLocation")){
-                sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN geoLocation varchar(20) default ''");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field geoLocation in repeater created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-        if (!isFieldExisting(db,"repeaters","aprsPass")){
-                sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN aprsPass varchar(5) default '0000'");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field aprsPass in repeater created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-        if (!isFieldExisting(db,"repeaters","aprsBeacon")){
-                sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN aprsBeacon varchar(100) default 'DMR repeater'");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field aprsBeacon in repeater created");
-                }
-                else{
-                        syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
-                        return 0;
-                }
-        }
-
-        if (!isFieldExisting(db,"repeaters","aprsPHG")){
-                sprintf(SQLQUERY,"ALTER TABLE repeaters ADD COLUMN aprsPHG varchar(7) default ''");
-                if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
-                        syslog(LOG_NOTICE,"field aprsPHG in repeater created");
+                        syslog(LOG_NOTICE,"field debug in master created");
                 }
                 else{
                         syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
@@ -246,5 +259,14 @@ int initDatabase(sqlite3 *db){
         }
 
 		
+	//Clean database
+	sprintf(SQLQUERY,"update repeaters set currentReflector = 0");
+	if (sqlite3_exec(db,SQLQUERY,0,0,0) == 0){
+		syslog(LOG_NOTICE,"Reflector status cleaned");
+	}
+	else{
+		syslog(LOG_NOTICE,"Database error: %s",sqlite3_errmsg(db));
+	}
+
 	return 1;
 }

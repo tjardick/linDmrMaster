@@ -26,8 +26,11 @@ int rdacPort = 50002;
 int baseRdacPort = 50200;
 int maxRepeaters = 20;
 int echoId = 9990;
+int echoSlot = 1;
 int rrsGpsId = 500;
-char version[5] = "2.0";
+char version[5] = "3.0";
+int masterDmrId = 0;
+int debug = false;
 
 struct repeater repeaterList[100] = {0};
 struct repeater emptyRepeater = {0};
@@ -35,10 +38,11 @@ struct masterInfo master;
 static const struct masterInfo emptyMaster = {0};
 struct ts tsInfo = {0};
 struct sockaddr_in discardList[100] = {0};
+struct reflector  localReflectors[100] = {0};
 
 int rdacSock=0;
 int highestRepeater = 0;
-int restart = 0;
+int numReflectors = 0;
 
 sqlite3 *db;
 sqlite3 *openDatabase();
@@ -62,6 +66,7 @@ void *dmrListener();
 void *rdacListener();
 void *sMasterThread();
 void *webServerListener();
+void *scheduler();
 
 void discard(struct sockaddr_in address){
 	int i;
@@ -112,6 +117,14 @@ int initRepeater(struct repeater repeaterInfo){
 	repeaterInfo.address.sin_port=htons(dmrPort);
 	repeaterList[i].address = repeaterInfo.address;
 	repeaterList[i].id = repeaterInfo.id;
+	repeaterList[i].conference[1] = 0;
+	repeaterList[i].conference[2] = repeaterInfo.autoReflector;
+	repeaterList[i].autoReflector = repeaterInfo.autoReflector;
+	repeaterList[i].intlRefAllow = repeaterInfo.intlRefAllow;
+	repeaterList[i].pearRepeater[1] = 0;
+	repeaterList[i].pearRepeater[2] = 0;
+	repeaterList[i].pearPos[1] = 0;
+	repeaterList[i].pearPos[2] = 0;
 	sprintf(repeaterList[i].callsign,"%s",repeaterInfo.callsign);
 	sprintf(repeaterList[i].txFreq,"%s",repeaterInfo.txFreq);
 	sprintf(repeaterList[i].shift,"%s",repeaterInfo.shift);
@@ -149,7 +162,13 @@ void delRepeater(struct sockaddr_in address){
                         repeaterList[i].rdacOnline = false;
                         repeaterList[i].rdacUpdated = false;
                         repeaterList[i].dmrOnline = false;
+						repeaterList[i].intlRefAllow = false;
+                        repeaterList[i].rdacUpdateAttempts = 0;
                         repeaterList[i].id = 0;
+                        repeaterList[i].upDated = 0;
+						repeaterList[i].conference[1] = 0;
+						repeaterList[i].conference[2] = 0;
+						repeaterList[i].autoReflector = 0;
                         repeaterList[i].lastPTPPConnect = 0;
                         repeaterList[i].lastDMRConnect = 0;
                         repeaterList[i].lastRDACConnect = 0;
@@ -179,9 +198,8 @@ void serviceListener(port){
 	socklen_t len;
 	unsigned char buffer[500];
 	unsigned char response[500] ={0};
-	unsigned char command[] = {0x50,0x32,0x50,0x50};
-	unsigned char ping[] = {0x5a,0x5a,0x5a,0x5a};
-	unsigned char ping2[] = {0xe8,0x40,0xb4,0x10};
+	unsigned char command[] = {0x50,0x32,0x50};
+	unsigned char ping[] = {0x0a,0x00,0x00,0x00,0x14};
 	char str[INET_ADDRSTRLEN];
 	int redirectPort;
 	int repPos;
@@ -220,6 +238,7 @@ void serviceListener(port){
 					case 0x10:{  //PTPP request received
 					if(isDiscarded(cliaddr)) continue;
 					rdacPos = setRdacRepeater(cliaddr);
+					if (rdacPos == 99) continue; //too many repeaters
 					if (difftime(timeNow,rdacList[rdacPos].lastPTPPConnect) < 10) continue;  //Ignore connect request
 					syslog(LOG_NOTICE,"PTPP request from repeater [%s]",str);
 					memcpy(response,buffer,n);
@@ -257,7 +276,8 @@ void serviceListener(port){
 					response[4]++;
 					response[13]=0x01;
 					response[n] = 0x01;
-					cliaddr.sin_port=htons(port);
+					//cliaddr.sin_port=htons(port);
+					cliaddr.sin_port=rdacList[rdacPos].address.sin_port;
 					sendto(sockfd,response,n+1,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
 					syslog(LOG_NOTICE,"Assigned DMR device 1 to repeater [%s - %s]",str,repeaterList[repPos].callsign);
 					//Assign port number
@@ -270,12 +290,14 @@ void serviceListener(port){
 					rport[3] = redirectPort >> 8;
 					memcpy(response + n,rport,4);
 					if (repeaterList[repPos].dmrOnline){  //If repeater is not offline, but we still get a request, just point it back to old thread
+						rdacList[repPos].rdacUpdateAttempts = 0;
+						rdacList[repPos].rdacUpdated = false;
 						syslog(LOG_NOTICE,"DMR request from repeater [%s - %s] already assigned a DMR port, not starting thread",str,repeaterList[repPos].callsign);
 					}
 					else{  //Start a new DMR thread for this repeater
-                                                struct sockInfo *param = malloc(sizeof(struct sockInfo));
-                                                param->address = cliaddr;
-                                                param->port = redirectPort;
+						struct sockInfo *param = malloc(sizeof(struct sockInfo));
+						param->address = cliaddr;
+						param->port = redirectPort;
 						pthread_create(&thread, NULL, dmrListener,param);
 					}
 					sendto(sockfd,response,n+4,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
@@ -286,16 +308,22 @@ void serviceListener(port){
 					int rdacPos;
 					//Initialize this repeater for RDAC
 					if(isDiscarded(cliaddr)) continue;
-					rdacPos = setRdacRepeater(cliaddr);
+					//rdacPos = setRdacRepeater(cliaddr);
+					rdacPos = findRdacRepeater(cliaddr);
+					cliaddr.sin_port=rdacList[rdacPos].address.sin_port;
 					if (difftime(timeNow,rdacList[rdacPos].lastRDACConnect) < 10) continue;  //Ignore connect request
 					syslog(LOG_NOTICE,"RDAC request from repeater [%s]",str);
-					if (rdacPos == 99) continue;   //If 99 returned, more repeaters then allowed
+					//if (rdacPos == 99) continue;   //If 99 returned, more repeaters then allowed
+					if (rdacPos == 99){
+						rdacPos = setRdacRepeater(cliaddr);
+						cliaddr.sin_port=htons(port);
+					}
 					memcpy(response,buffer,n);
 					//Assign device ID
 					response[4]++;
 					response[13]=0x01;
 					response[n] = 0x01;
-					cliaddr.sin_port=htons(port);
+					//cliaddr.sin_port=htons(port);
 					sendto(sockfd,response,n+1,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
 					syslog(LOG_NOTICE,"Assigned RDAC device 1 to repeater [%s]",str);
 					//Assign port number
@@ -309,6 +337,7 @@ void serviceListener(port){
 					memcpy(response + n,port,4);
 					if (rdacList[rdacPos].rdacOnline){  //If repeater is not offline, but we still get a request, just point it back to old thread
 						syslog(LOG_NOTICE,"RDAC request from repeater [%s - %s] already assigned a RDAC port, not starting thread",str,rdacList[rdacPos].callsign);
+						rdacList[rdacPos].rdacUpdateAttempts = 0;
 					}
 					else{  //Start a new RDAC thread for this repeater
 						struct sockInfo *param = malloc(sizeof(struct sockInfo));
@@ -320,23 +349,14 @@ void serviceListener(port){
 					syslog(LOG_NOTICE,"Re-directed repeater [%s] to RDAC port %i",str,redirectPort);
 					time(&rdacList[rdacPos].lastRDACConnect);
 					break;}
+
 				}
 			}
 		
-			if ((memcmp(buffer,ping,sizeof(ping)) == 0 || memcmp(buffer,ping2,sizeof(ping2)) == 0) && repeaterList[findRepeater(cliaddr)].dmrOnline){//Is this a heartbeat from a repeater on the service port ? And do we know the repeater ?
+			if ((memcmp(buffer+4,ping,sizeof(ping)) == 0) && repeaterList[findRepeater(cliaddr)].dmrOnline){//Is this a heartbeat from a repeater on the service port ? And do we know the repeater ?
 				memcpy(response,buffer,n);
 				response[12]++;
 				sendto(sockfd,response,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-				if (restart){
-					syslog(LOG_NOTICE,"Exiting serviceListener (restart)");
-					return;
-				}
-			}
-		}
-		else{
-			if (restart){
-				syslog(LOG_NOTICE,"Exiting serviceListener (restart)");
-				return;
 			}
 		}
 	}
@@ -376,7 +396,7 @@ int getMasterInfo(){
     syslog(LOG_NOTICE,"sMaster info: ownName %s, ownCountryCode %s, ownRegion %s, sMasterIp %s, sMasterPort %s",
 	master.ownName,master.ownCountryCode,master.ownRegion,master.sMasterIp,master.sMasterPort);
 	
-	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort FROM master");
+	sprintf(SQLQUERY,"SELECT servicePort, rdacPort, dmrPort, baseDmrPort, maxRepeaters, echoId,rrsGpsId,aprsUrl,aprsPort,echoSlot,baseRdacPort,masterDmrId FROM master");
 	if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
 		if (sqlite3_step(stmt) == SQLITE_ROW){
 			servicePort = sqlite3_column_int(stmt,0);
@@ -388,7 +408,9 @@ int getMasterInfo(){
 			rrsGpsId = sqlite3_column_int(stmt,6);
 			sprintf(aprsUrl,"%s",sqlite3_column_text(stmt,7));
 			sprintf(aprsPort,"%s",sqlite3_column_text(stmt,8));
-
+			echoSlot = sqlite3_column_int(stmt,9);
+			baseRdacPort = sqlite3_column_int(stmt,10);
+			masterDmrId = sqlite3_column_int(stmt,11);
 		}
 		else{
 			syslog(LOG_NOTICE,"failed to read masterInfo, no row");
@@ -402,8 +424,8 @@ int getMasterInfo(){
 		closeDatabase(db);
 		return 0;
 	}
-	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i rrsGpsId %i",
-	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,rrsGpsId);
+	syslog(LOG_NOTICE,"ServicePort %i rdacPort %i dmrPort %i baseDmrPort %i baseRdacPort %i maxRepeaters %i echoId %i echoSlot %i rrsGpsId %i software_ID %i",
+	servicePort,rdacPort,dmrPort,baseDmrPort,baseRdacPort,maxRepeaters-1,echoId,echoSlot,rrsGpsId,masterDmrId);
 	syslog(LOG_NOTICE,"Assigning APRS server %s port %s",aprsUrl,aprsPort);
 	if (maxRepeaters > 98){
 		syslog(LOG_NOTICE,"maxRepeaters exceeded 98, quiting application");
@@ -414,6 +436,35 @@ int getMasterInfo(){
 	sqlite3_finalize(stmt);
 	closeDatabase(db);
 	return 1;
+}
+
+
+void getLocalReflectors(){
+        unsigned char SQLQUERY[200] = {0};
+        sqlite3_stmt *stmt;
+
+        db = openDatabase();
+        sprintf(SQLQUERY,"SELECT id,name,type FROM localReflectors");
+        if (sqlite3_prepare_v2(db,SQLQUERY,-1,&stmt,0) == 0){
+			while (sqlite3_step(stmt) == SQLITE_ROW){
+				localReflectors[numReflectors].id = sqlite3_column_int(stmt,0);
+				sprintf(localReflectors[numReflectors].name,"%s",sqlite3_column_text(stmt,1));
+				localReflectors[numReflectors].type = sqlite3_column_int(stmt,2);
+				syslog(LOG_NOTICE,"Added reflector %i %s type %s",localReflectors[numReflectors].id,localReflectors[numReflectors].name,localReflectors[numReflectors].type == 1 ? "intl":"local");
+				numReflectors++;
+				if (numReflectors > 100){
+					syslog(LOG_NOTICE,"MORE THAN 100 REFLECTORS DEFINED IN DATABASE, ONLY FIRST 100 ADDED");
+					break;
+				}
+			}
+        }
+        else{
+                syslog(LOG_NOTICE,"failed to read localReflectors, query bad");
+                closeDatabase(db);
+                return;
+        }
+        sqlite3_finalize(stmt);
+	closeDatabase(db);
 }
 
 int loadTalkGroups(){
@@ -603,43 +654,37 @@ int loadTalkGroups(){
 	return 0;
 }
 
+void setRepeatersOffline(){
+	char SQLQUERY[400];
+	char timeStamp[20];
+
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	strftime(timeStamp,sizeof(timeStamp),"%Y-%m-%d %H:%M:%S",t);
+	syslog(LOG_NOTICE,"Setting all repeaters to status offline in database");
+	db = openDatabase();
+	sprintf(SQLQUERY,"UPDATE repeaters set online = 0, timeStamp = '%s'",timeStamp);
+	if (sqlite3_exec(db,SQLQUERY,0,0,0) != 0){
+		syslog(LOG_NOTICE,"Failed to update repeater table: %s",sqlite3_errmsg(db));
+		syslog(LOG_NOTICE,"QUERY: %s",SQLQUERY);
+	}
+	closeDatabase(db);
+}
 
 int main(int argc, char**argv)
 {
 	
-	// Our process ID and Session ID
-	pid_t pid,sid;
-	
-	/*printf("Becoming a daemon...\n");
-	// Fork off the parent process
+	int pid;
 	pid = fork();
-    if (pid < 0) {
-		exit(EXIT_FAILURE);
-    }
-	
-	// If we got a good PID, then we can exit the parent process. 
-    if (pid > 0) {
-		exit(EXIT_SUCCESS);
-    }
-	
-	// Change the file mode mask 
-    umask(0);*/
+	if (pid == 0){
+		static char *argv[]={"webGui","-F",NULL};
+		execv("./webGui",argv);
+		exit(127);
+	}
     
 	setlogmask (LOG_UPTO (LOG_NOTICE));
 	openlog("Master-server", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
      
-	// Create a new SID for the child process 
-    /*sid = setsid();
-    if (sid < 0) {
-		// Log the failure 
-		exit(EXIT_FAILURE);
-    }
-	
-	// Close out the standard file descriptors 
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);*/
-	
 	pthread_t thread;
 	int port;
 	int dbInit;
@@ -655,30 +700,20 @@ int main(int argc, char**argv)
 		return 0;
 	}
 	closeDatabase(db);
-	//Start webserver thread
-	pthread_create(&thread, NULL, webServerListener,NULL);
+	//Start scheduler thread
+	pthread_create(&thread, NULL, scheduler,NULL);
 
-    for(;;){
-		restart = 0;
-		dmrState[1] = IDLE;
-		dmrState[2] = IDLE;
-		//Get info to get us going
-		if(!getMasterInfo()) return 0;
-		//Load the allowed talkgroups
-		if(!loadTalkGroups()) return 0;
-		//Start sMaster Thread
-		pthread_create(&thread, NULL, sMasterThread,NULL);
-		//Start listening on the service port
-		openAprsSock();
-		serviceListener(servicePort);
-		//If we got here, we are restarting, waiting for all threads to end
-		sleep(6);
-		close(aprsSockFd);
-		master = emptyMaster;
-		highestRepeater = 0;
-		for (i=0;i<99;i++){
-			repeaterList[i] = emptyRepeater;
-			rdacList[i] = emptyRepeater;
-		}
-	}
+	dmrState[1] = IDLE;
+	dmrState[2] = IDLE;
+	//Get info to get us going
+	if(!getMasterInfo()) return 0;
+	//Load the allowed talkgroups
+	if(!loadTalkGroups()) return 0;
+	getLocalReflectors();
+	setRepeatersOffline();
+	//Start sMaster Thread
+	pthread_create(&thread, NULL, sMasterThread,NULL);
+	//Start listening on the service port
+	openAprsSock();
+	serviceListener(servicePort);
 }
